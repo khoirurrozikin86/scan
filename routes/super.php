@@ -9,8 +9,8 @@ use App\Http\Controllers\Admin\{
     CategoryController,
     TicketController,
     DashboardController,
-
     OutletController,
+    TicketQrcodeController,
 };
 
 Route::middleware(['auth'])
@@ -65,57 +65,57 @@ Route::middleware(['auth'])
 
 
         // CATEGORIES
-        Route::middleware('permission:categories.view')
-            ->get('categories', [CategoryController::class, 'index'])
-            ->name('categories.index');
+        // Route::middleware('permission:categories.view')
+        //     ->get('categories', [CategoryController::class, 'index'])
+        //     ->name('categories.index');
 
-        Route::middleware('permission:categories.view')
-            ->get('categories/dt', [CategoryController::class, 'dt'])
-            ->name('categories.dt');
+        // Route::middleware('permission:categories.view')
+        //     ->get('categories/dt', [CategoryController::class, 'dt'])
+        //     ->name('categories.dt');
 
-        Route::middleware('permission:categories.view')
-            ->get('categories/export/xlsx', [CategoryController::class, 'export'])
-            ->name('categories.export');
+        // Route::middleware('permission:categories.view')
+        //     ->get('categories/export/xlsx', [CategoryController::class, 'export'])
+        //     ->name('categories.export');
 
-        Route::middleware('permission:categories.create')
-            ->post('categories', [CategoryController::class, 'store'])
-            ->name('categories.store');
+        // Route::middleware('permission:categories.create')
+        //     ->post('categories', [CategoryController::class, 'store'])
+        //     ->name('categories.store');
 
-        Route::middleware('permission:categories.update')
-            ->put('categories/{category}', [CategoryController::class, 'update'])
-            ->name('categories.update');
+        // Route::middleware('permission:categories.update')
+        //     ->put('categories/{category}', [CategoryController::class, 'update'])
+        //     ->name('categories.update');
 
-        Route::middleware('permission:categories.delete')
-            ->delete('categories/{category}', [CategoryController::class, 'destroy'])
-            ->name('categories.destroy');
+        // Route::middleware('permission:categories.delete')
+        //     ->delete('categories/{category}', [CategoryController::class, 'destroy'])
+        //     ->name('categories.destroy');
 
 
 
 
         // TICKETS
-        Route::middleware('permission:tickets.view')
-            ->get('tickets', [TicketController::class, 'index'])
-            ->name('tickets.index');
+        // Route::middleware('permission:tickets.view')
+        //     ->get('tickets', [TicketController::class, 'index'])
+        //     ->name('tickets.index');
 
-        Route::middleware('permission:tickets.view')
-            ->get('tickets/dt', [TicketController::class, 'dt'])
-            ->name('tickets.dt');
+        // Route::middleware('permission:tickets.view')
+        //     ->get('tickets/dt', [TicketController::class, 'dt'])
+        //     ->name('tickets.dt');
 
-        Route::middleware('permission:tickets.view')
-            ->get('tickets/export/xlsx', [TicketController::class, 'export'])
-            ->name('tickets.export');
+        // Route::middleware('permission:tickets.view')
+        //     ->get('tickets/export/xlsx', [TicketController::class, 'export'])
+        //     ->name('tickets.export');
 
-        Route::middleware('permission:tickets.create')
-            ->post('tickets', [TicketController::class, 'store'])
-            ->name('tickets.store');
+        // Route::middleware('permission:tickets.create')
+        //     ->post('tickets', [TicketController::class, 'store'])
+        //     ->name('tickets.store');
 
-        Route::middleware('permission:tickets.update')
-            ->put('tickets/{ticket}', [TicketController::class, 'update'])
-            ->name('tickets.update');
+        // Route::middleware('permission:tickets.update')
+        //     ->put('tickets/{ticket}', [TicketController::class, 'update'])
+        //     ->name('tickets.update');
 
-        Route::middleware('permission:tickets.delete')
-            ->delete('tickets/{ticket}', [TicketController::class, 'destroy'])
-            ->name('tickets.destroy');
+        // Route::middleware('permission:tickets.delete')
+        //     ->delete('tickets/{ticket}', [TicketController::class, 'destroy'])
+        //     ->name('tickets.destroy');
 
 
 
@@ -147,6 +147,43 @@ Route::middleware(['auth'])
         Route::middleware('permission:outlets.view')
             ->get('outlets/export/xlsx', [OutletController::class, 'export'])
             ->name('outlets.export');
+
+
+
+        Route::prefix('ticket-qrcodes')
+            ->name('ticket-qrcodes.')
+            ->group(function () {
+
+                Route::get(
+                    '/',
+                    [TicketQrcodeController::class, 'index']
+                )->name('index');
+
+                Route::get(
+                    '/dt',
+                    [TicketQrcodeController::class, 'dt']
+                )->name('dt');
+
+                Route::post(
+                    '/',
+                    [TicketQrcodeController::class, 'store']
+                )->name('store');
+
+                Route::put(
+                    '/{ticketQrcode}',
+                    [TicketQrcodeController::class, 'update']
+                )->name('update');
+
+                Route::delete(
+                    '/{ticketQrcode}',
+                    [TicketQrcodeController::class, 'destroy']
+                )->name('destroy');
+
+                Route::post(
+                    '/import',
+                    [TicketQrcodeController::class, 'import']
+                )->name('import');
+            });
 
 
 

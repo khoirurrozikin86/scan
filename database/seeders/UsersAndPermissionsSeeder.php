@@ -27,8 +27,9 @@ class UsersAndPermissionsSeeder extends Seeder
             'role'       => ['menu', 'create', 'read', 'update', 'delete'],
             'permission' => ['menu', 'create', 'read', 'update', 'delete'],
             'outlets'    => ['view', 'create', 'update', 'delete'],
-            'categories' => ['view', 'create', 'update', 'delete'],
-            'tickets'    => ['view', 'create', 'update', 'delete'],
+            'tiket-qrcode' => ['view', 'create', 'update', 'delete'],
+
+
 
         ];
 
@@ -48,8 +49,8 @@ class UsersAndPermissionsSeeder extends Seeder
         // 👤 USER: hanya bisa lihat (read/view)
         $roles['user']->syncPermissions([
             'dashboard.view',
-            'tickets.view',
-            'categories.view',
+            'outlets.view',
+            'tiket-qrcode.view',
         ]);
 
         // 👨‍💼 ADMIN: CRUD penuh semua modul utama
@@ -73,14 +74,11 @@ class UsersAndPermissionsSeeder extends Seeder
             'outlets.update',
             'outlets.delete',
 
-            'categories.view',
-            'categories.create',
-            'categories.update',
-            'categories.delete',
-            'tickets.view',
-            'tickets.create',
-            'tickets.update',
-            'tickets.delete',
+            'tiket-qrcode.view',
+            'tiket-qrcode.create',
+            'tiket-qrcode.update',
+            'tiket-qrcode.delete',
+
 
         ]);
 
