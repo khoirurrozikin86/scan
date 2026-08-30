@@ -63,7 +63,7 @@
 @endsection
 
 {{-- Modal Create/Edit --}}
-<div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true" style="display: none;">
 
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -85,82 +85,61 @@
 
 
 
-                    <div class="col-md-12">
-    <label class="form-label">
-        Outlet Code
-        <span class="text-danger">*</span>
-    </label>
+                        <div class="col-md-12">
+                            <label class="form-label">
+                                Outlet Code
+                                <span class="text-danger">*</span>
+                            </label>
 
-    <input
-        type="text"
-        class="form-control"
-        id="outlet_code"
-        name="outlet_code"
-        required
-    >
+                            <input type="text" class="form-control" id="outlet_code" name="outlet_code" required>
 
-    <div class="invalid-feedback" id="outlet_codeErr"></div>
-</div>
+                            <div class="invalid-feedback" id="outlet_codeErr"></div>
+                        </div>
 
-<div class="col-md-12">
-    <label class="form-label">
-        Outlet Name
-        <span class="text-danger">*</span>
-    </label>
+                        <div class="col-md-12">
+                            <label class="form-label">
+                                Outlet Name
+                                <span class="text-danger">*</span>
+                            </label>
 
-    <input
-        type="text"
-        class="form-control"
-        id="outlet_name"
-        name="outlet_name"
-        required
-    >
+                            <input type="text" class="form-control" id="outlet_name" name="outlet_name" required>
 
-    <div class="invalid-feedback" id="outlet_nameErr"></div>
-</div>
+                            <div class="invalid-feedback" id="outlet_nameErr"></div>
+                        </div>
 
-<div class="col-md-12">
-    <label class="form-label">
-        Outlet Type
-        <span class="text-danger">*</span>
-    </label>
+                        <div class="col-md-12">
+                            <label class="form-label">
+                                Outlet Type
+                                <span class="text-danger">*</span>
+                            </label>
 
-    <select
-        class="form-select"
-        id="outlet_type"
-        name="outlet_type"
-        required
-    >
-        <option value="">Select Type</option>
-        <option value="Admin">Admin</option>
-        <option value="Superadmin">Superadmin</option>
-        <option value="Wahana Vendor">Wahana Vendor</option>
-        <option value="Wahana InHouse">Wahana InHouse</option>
-    </select>
+                            <select class="form-select" id="outlet_type" name="outlet_type" required>
+                                <option value="">Select Type</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Superadmin">Superadmin</option>
+                                <option value="Wahana Vendor">Wahana Vendor</option>
+                                <option value="Wahana InHouse">Wahana InHouse</option>
+                            </select>
 
-    <div class="invalid-feedback" id="outlet_typeErr"></div>
-</div>
+                            <div class="invalid-feedback" id="outlet_typeErr"></div>
+                        </div>
 
-<div class="col-md-12">
-    <label class="form-label">
-        Status
-    </label>
+                        <div class="col-md-12">
+                            <label class="form-label">
+                                Status
+                            </label>
 
-    <select
-        class="form-select"
-        id="is_active"
-        name="is_active"
-    >
-        <option value="1">Active</option>
-        <option value="0">Not Active</option>
-    </select>
+                            <select class="form-select" id="is_active" name="is_active">
+                                <option value="1">Active</option>
+                                <option value="0">Not Active</option>
+                            </select>
 
-    <div class="invalid-feedback" id="is_activeErr"></div>
-</div>
+                            <div class="invalid-feedback" id="is_activeErr"></div>
+                        </div>
 
 
 
-<!-- 
+                        <!--
                         <div class="col-md-12">
                             <label class="form-label">
                                 Name
@@ -202,14 +181,15 @@
     </div>
 </div>
 
-@push('vendor-styles')
-    <link rel="stylesheet" href="{{ asset('vendor/nobleui/assets/vendors/datatables.net-bs5/dataTables.bootstrap5.css') }}">
+{{-- @push('vendor-styles')
+    <link rel="stylesheet"
+        href="{{ asset('vendor/nobleui/assets/vendors/datatables.net-bs5/dataTables.bootstrap5.css') }}">
 @endpush
 
 @push('vendor-scripts')
     <script src="{{ asset('vendor/nobleui/assets/vendors/datatables.net/jquery.dataTables.js') }}"></script>
     <script src="{{ asset('vendor/nobleui/assets/vendors/datatables.net-bs5/dataTables.bootstrap5.js') }}"></script>
-@endpush
+@endpush --}}
 
 @push('scripts')
     <script>
@@ -279,20 +259,20 @@
 
             function clearErrors() {
 
-    [
-        $outletCode,
-        $outletName,
-        $outletType,
-        $isActive
-    ].forEach($el => {
-        $el.removeClass('is-invalid');
-    });
+                [
+                    $outletCode,
+                    $outletName,
+                    $outletType,
+                    $isActive
+                ].forEach($el => {
+                    $el.removeClass('is-invalid');
+                });
 
-    $outletCodeErr.text('');
-    $outletNameErr.text('');
-    $outletTypeErr.text('');
-    $isActiveErr.text('');
-}
+                $outletCodeErr.text('');
+                $outletNameErr.text('');
+                $outletTypeErr.text('');
+                $isActiveErr.text('');
+            }
 
             function toastOk(msg) {
 
@@ -409,10 +389,10 @@
 
 
 
-    $outletCode.val(payload.outlet_code || '');
-    $outletName.val(payload.outlet_name || '');
-    $outletType.val(payload.outlet_type || '');
-    $isActive.val(payload.is_active ? '1' : '0');
+                $outletCode.val(payload.outlet_code || '');
+                $outletName.val(payload.outlet_name || '');
+                $outletType.val(payload.outlet_type || '');
+                $isActive.val(payload.is_active ? '1' : '0');
 
 
                 bsModal.show();
@@ -533,7 +513,7 @@
                     $(DT_SEL).DataTable().search() || '';
 
                 const url =
-                    @json(route('super.categories.export'));
+                    @json(route('super.outlets.export'));
 
                 window.location =
                     url +

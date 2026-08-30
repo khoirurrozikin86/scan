@@ -48,7 +48,7 @@
 @endsection
 
 {{-- Modal --}}
-<div class="modal fade" id="permissionModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="permissionModal" tabindex="-1" aria-hidden="true" style="display: none;">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="permissionForm">

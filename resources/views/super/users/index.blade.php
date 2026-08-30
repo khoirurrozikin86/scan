@@ -44,7 +44,7 @@
 @endsection
 
 {{-- Modal Create/Edit User (tanpa field Active) --}}
-<div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true" style="display: none;">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="userForm">

@@ -9,7 +9,7 @@ use App\Http\Controllers\Admin\{
     CategoryController,
     TicketController,
     DashboardController,
-    
+
     OutletController,
 };
 
@@ -120,17 +120,17 @@ Route::middleware(['auth'])
 
 
 
-             // OUTLET
+        // OUTLET
         Route::middleware('permission:outlets.view')
             ->get('outlets', [OutletController::class, 'index'])
             ->name('outlets.index');
 
-            Route::middleware('permission:outlets.view')
+        Route::middleware('permission:outlets.view')
             ->get('outlets/dt', [OutletController::class, 'dt'])
             ->name('outlets.dt');
 
 
-             Route::middleware('permission:outlets.update')
+        Route::middleware('permission:outlets.update')
             ->put('outlets/{outlet}', [OutletController::class, 'update'])
             ->name('outlets.update');
 
@@ -138,14 +138,21 @@ Route::middleware(['auth'])
             ->delete('outlets/{outlet}', [OutletController::class, 'destroy'])
             ->name('outlets.destroy');
 
-            
+
         Route::middleware('permission:outlets.create')
             ->post('outlets', [OutletController::class, 'store'])
             ->name('outlets.store');
 
 
+        Route::middleware('permission:outlets.view')
+            ->get('outlets/export/xlsx', [OutletController::class, 'export'])
+            ->name('outlets.export');
 
-       
+
+
+
+
+
 
 
         Route::middleware('permission:tickets.update')

@@ -13,6 +13,9 @@ use App\Models\Outlet;
 
 use Yajra\DataTables\Facades\DataTables;
 
+use App\Exports\OutletsExport;
+use Maatwebsite\Excel\Facades\Excel;
+
 class OutletController extends Controller
 {
     public function index()
@@ -26,13 +29,13 @@ class OutletController extends Controller
 
             ->editColumn(
                 'updated_at',
-                fn (Outlet $outlet) => optional($outlet->updated_at)
+                fn(Outlet $outlet) => optional($outlet->updated_at)
                     ->format('Y-m-d H:i')
             )
 
             ->editColumn(
                 'is_active',
-                fn (Outlet $outlet) => $outlet->is_active
+                fn(Outlet $outlet) => $outlet->is_active
                     ? 'Active'
                     : 'Not Active'
             )
@@ -146,10 +149,19 @@ class OutletController extends Controller
             ])
 
             : redirect()
-                ->route('super.outlets.index')
-                ->with(
-                    'success',
-                    'Outlet deleted'
-                );
+            ->route('super.outlets.index')
+            ->with(
+                'success',
+                'Outlet deleted'
+            );
+    }
+
+
+    public function export()
+    {
+        return Excel::download(
+            new OutletsExport(),
+            'outlets-' . now()->format('Y-m-d-His') . '.xlsx'
+        );
     }
 }
