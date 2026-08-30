@@ -162,38 +162,113 @@ Route::middleware(['auth'])
 
 
 
-
         Route::prefix('scan')
             ->name('scan-records.')
             ->group(function () {
 
+                /*
+        |--------------------------------------------------------------------------
+        | CAMERA
+        |--------------------------------------------------------------------------
+        */
+
                 Route::get(
                     '/camera',
                     [ScanController::class, 'camera']
-                )->name('camera');
+                )
+                    ->middleware('permission:scan-records.view')
+                    ->name('camera');
+
+
+                /*
+        |--------------------------------------------------------------------------
+        | BARCODE SCANNER
+        |--------------------------------------------------------------------------
+        */
 
                 Route::get(
                     '/scanner',
                     [ScanController::class, 'scanner']
-                )->name('scanner');
+                )
+                    ->middleware('permission:scan-records.view')
+                    ->name('scanner');
+
+
+                /*
+        |--------------------------------------------------------------------------
+        | SCAN RECORD REPORT
+        |--------------------------------------------------------------------------
+        */
 
                 Route::get(
                     '/records',
                     [ScanController::class, 'index']
-                )->name('index');
+                )
+                    ->middleware('permission:scan-records.view')
+                    ->name('index');
+
+
+                /*
+        |--------------------------------------------------------------------------
+        | DATATABLE
+        |--------------------------------------------------------------------------
+        */
 
                 Route::get(
                     '/records/dt',
                     [ScanController::class, 'dt']
-                )->name('dt');
+                )
+                    ->middleware('permission:scan-records.view')
+                    ->name('dt');
 
 
-                Route::post('/scan', [ScanController::class, 'scan'])
+                /*
+        |--------------------------------------------------------------------------
+        | PROCESS SCAN
+        |--------------------------------------------------------------------------
+        */
+
+                Route::post(
+                    '/scan',
+                    [ScanController::class, 'scan']
+                )
+                    ->middleware('permission:scan-records.create')
                     ->name('scan');
+
+
+                /*
+        |--------------------------------------------------------------------------
+        | HISTORY 10 TERAKHIR
+        |--------------------------------------------------------------------------
+        */
 
                 Route::get(
                     '/history',
                     [ScanController::class, 'history']
-                )->name('history');
+                )
+                    ->middleware('permission:scan-records.view')
+                    ->name('history');
+
+
+                /*
+        |--------------------------------------------------------------------------
+        | DELETE SCAN RECORD
+        |--------------------------------------------------------------------------
+        */
+
+                Route::delete(
+                    '/records/{scanRecord}',
+                    [ScanController::class, 'destroy']
+                )
+                    ->middleware('permission:scan-records.delete')
+                    ->name('destroy');
+
+
+                Route::get(
+                    '/records/export',
+                    [ScanController::class, 'export']
+                )
+                    ->middleware('permission:scan-records.view')
+                    ->name('export');
             });
     });

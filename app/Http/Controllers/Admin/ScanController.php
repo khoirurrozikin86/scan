@@ -12,6 +12,12 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
 
+
+use App\Exports\ScanRecordsExport;
+use Maatwebsite\Excel\Facades\Excel;
+
+
+
 class ScanController extends Controller
 {
     /**
@@ -255,12 +261,49 @@ class ScanController extends Controller
     /**
      * DataTable Scan Records
      */
-    public function dt(
-        ScanRecordTableQuery $q
-    ) {
-        return DataTables::eloquent(
-            $q->builder()
-        )
+
+    public function dt(Request $request)
+    {
+        $query = ScanRecord::query()
+            ->with([
+                'user',
+                'outlet',
+            ]);
+
+
+        /*
+    |--------------------------------------------------------------------------
+    | FILTER DARI TANGGAL
+    |--------------------------------------------------------------------------
+    */
+
+        if ($request->filled('date_from')) {
+
+            $query->whereDate(
+                'scanned_at',
+                '>=',
+                $request->date_from
+            );
+        }
+
+
+        /*
+    |--------------------------------------------------------------------------
+    | FILTER SAMPAI TANGGAL
+    |--------------------------------------------------------------------------
+    */
+
+        if ($request->filled('date_to')) {
+
+            $query->whereDate(
+                'scanned_at',
+                '<=',
+                $request->date_to
+            );
+        }
+
+
+        return DataTables::of($query)
 
             ->addColumn(
                 'user_name',
@@ -271,19 +314,16 @@ class ScanController extends Controller
             ->addColumn(
                 'outlet_name',
                 fn($scan) =>
-                $scan->outlet
-                    ? $scan->outlet->outlet_code
-                    . ' - '
-                    . $scan->outlet->outlet_name
-                    : '-'
+                $scan->outlet?->outlet_name ?? '-'
             )
 
-            ->editColumn(
-                'scanned_at',
+            ->addColumn(
+                'outlet_type',
                 fn($scan) =>
-                optional($scan->scanned_at)
-                    ->format('Y-m-d H:i:s')
+                $scan->outlet?->outlet_type ?? '-'
             )
+
+
 
             ->editColumn(
                 'scan_method',
@@ -291,62 +331,106 @@ class ScanController extends Controller
                 ucfirst($scan->scan_method)
             )
 
+            ->editColumn(
+                'scanned_at',
+                fn($scan) =>
+                $scan->scanned_at
+                    ? $scan->scanned_at->format(
+                        'd-m-Y H:i:s'
+                    )
+                    : '-'
+            )
+
+
+            ->addColumn('action', function ($scan) {
+
+                return '
+        <span
+            class="badge bg-danger btn-delete-scan"
+            data-url="' . route(
+                    'super.scan-records.destroy',
+                    ['scanRecord' => $scan->id]
+                ) . '"
+            title="Hapus"
+            style="cursor:pointer;">
+
+            <i class="fas fa-trash">X</i>
+
+        </span>
+    ';
+            })
+
+
+
             ->rawColumns([
-                'user_name',
-                'outlet_name',
+                'action'
             ])
 
-            ->toJson();
+            ->make(true);
     }
+
+
+
+
+
 
 
 
     public function history(Request $request)
     {
-        $request->validate([
-            'outlet_id' => [
-                'required',
-                'integer',
-            ],
-        ]);
-
         $user = auth()->user();
 
+        $outletId = $request->input('outlet_id');
+
+        if (!$outletId) {
+            return response()->json([
+                'data' => [],
+            ]);
+        }
 
         /*
     |--------------------------------------------------------------------------
     | CEK AKSES OUTLET
     |--------------------------------------------------------------------------
+    | Super Admin boleh semua outlet
     */
 
-        $outlet = $user->outlets()
-            ->where('outlets.id', $request->outlet_id)
-            ->where('outlets.is_active', true)
-            ->where('outlets.is_scanner_enabled', true)
-            ->first();
+        $isSuperAdmin = $user->hasRole('super-admin');
 
+        if (!$isSuperAdmin) {
 
-        if (!$outlet) {
+            $hasAccess = $user->outlets()
+                ->where('outlets.id', $outletId)
+                ->where('outlets.is_active', true)
+                ->exists();
 
-            return response()->json([
-                'message' => 'Anda tidak memiliki akses ke outlet ini.',
-            ], 403);
+            if (!$hasAccess) {
+
+                return response()->json([
+                    'message' => 'Anda tidak memiliki akses ke outlet ini.'
+                ], 403);
+            }
         }
 
 
         /*
     |--------------------------------------------------------------------------
-    | 10 SCAN TERBARU
+    | AMBIL 10 HISTORY TERBARU
     |--------------------------------------------------------------------------
     */
 
         $records = ScanRecord::query()
-            ->with('ticketQrcode')
-            ->where('outlet_id', $outlet->id)
+            ->where('outlet_id', $outletId)
             ->latest('scanned_at')
             ->limit(10)
             ->get();
 
+
+        /*
+    |--------------------------------------------------------------------------
+    | RESPONSE
+    |--------------------------------------------------------------------------
+    */
 
         return response()->json([
 
@@ -356,11 +440,13 @@ class ScanController extends Controller
 
                     'qrcode' => $record->qrcode,
 
-                    'no_tiket' =>
-                    $record->ticketQrcode?->no_tiket,
+                    'no_tiket' => $record->no_tiket,
 
-                    'scanned_at' =>
-                    $record->scanned_at
+                    'ticket_type' => $record->ticket_type,
+
+                    'scan_method' => $record->scan_method,
+
+                    'scanned_at' => $record->scanned_at
                         ? $record->scanned_at->format(
                             'd-m-Y H:i:s'
                         )
@@ -370,5 +456,58 @@ class ScanController extends Controller
             }),
 
         ]);
+    }
+
+
+
+    public function destroy(ScanRecord $scanRecord)
+    {
+        $scanRecord->delete();
+
+        return response()->json([
+            'message' => 'Data scan berhasil dihapus.',
+        ]);
+    }
+
+
+
+
+
+
+    public function export(Request $request)
+    {
+        $dateFrom = $request->input('date_from');
+        $dateTo   = $request->input('date_to');
+
+        if (!$dateFrom || !$dateTo) {
+
+            return back()->with(
+                'error',
+                'Tanggal filter belum dipilih.'
+            );
+        }
+
+        if ($dateFrom > $dateTo) {
+
+            return back()->with(
+                'error',
+                'Range tanggal tidak valid.'
+            );
+        }
+
+        $filename =
+            'scan-records_' .
+            $dateFrom .
+            '_sd_' .
+            $dateTo .
+            '.xlsx';
+
+        return Excel::download(
+            new ScanRecordsExport(
+                $dateFrom,
+                $dateTo
+            ),
+            $filename
+        );
     }
 }

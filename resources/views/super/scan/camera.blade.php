@@ -52,8 +52,8 @@
 
                         </select>
 
-                        <div id="outletError" class="text-danger small mt-2">
-                        </div>
+                        {{-- <div id="outletError" class="text-danger small mt-2">
+                        </div> --}}
 
                     </div>
 
@@ -148,20 +148,44 @@
 
         {{-- RESULT --}}
 
-        <div id="scanResult" class="card mt-4 d-none">
+        <div class="card mt-4">
+
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i data-feather="clock"></i>
+                    10 Scan Terakhir
+                </h5>
+            </div>
 
             <div class="card-body">
 
-                <h5 class="mb-3">
+                <div class="table-responsive">
 
-                    <i data-feather="check-circle"></i>
+                    <table class="table table-bordered table-hover">
 
-                    Hasil Scan
+                        <thead>
+                            <tr>
+                                <th width="50">No</th>
+                                <th>QR Code</th>
+                                <th>No Tiket</th>
+                                <th>Ticket Type</th>
+                                <th>Method</th>
+                                <th>Waktu Scan</th>
+                            </tr>
+                        </thead>
 
-                </h5>
+                        <tbody id="scanHistory">
 
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    Belum ada data scan.
+                                </td>
+                            </tr>
 
-                <div id="scanResultContent">
+                        </tbody>
+
+                    </table>
+
                 </div>
 
             </div>
@@ -172,232 +196,683 @@
 @endsection
 
 
+
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
 @push('scripts')
     <script>
-        document.addEventListener(
-            'DOMContentLoaded',
-            function() {
+        $(document).ready(function() {
 
-                const outlet =
-                    document.getElementById(
-                        'outlet_id'
-                    );
+            loadHistory();
 
-                const btnStart =
-                    document.getElementById(
-                        'btnStartCamera'
-                    );
-
-                const btnStop =
-                    document.getElementById(
-                        'btnStopCamera'
-                    );
-
-                const video =
-                    document.getElementById(
-                        'cameraPreview'
-                    );
-
-                const status =
-                    document.getElementById(
-                        'cameraStatus'
-                    );
+            let qrScanner = null;
+            let scanning = false;
+            let processing = false;
 
 
-                let stream = null;
+            /*
+            |--------------------------------------------------------------------------
+            | START CAMERA
+            |--------------------------------------------------------------------------
+            */
 
+            $('#btnStartCamera').on('click', function() {
 
-                /*
-                |--------------------------------------------------------------------------
-                | Feather
-                |--------------------------------------------------------------------------
-                */
+                let outletId = $('#outlet_id').val();
 
-                if (window.feather) {
+                if (!outletId) {
 
-                    feather.replace();
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Pilih Outlet',
+                        text: 'Silakan pilih outlet terlebih dahulu.',
+                        showConfirmButton: false,
+                        timer: 2500,
+                        timerProgressBar: true
+                    });
 
+                    return;
                 }
 
+                startCamera();
 
-                /*
-                |--------------------------------------------------------------------------
-                | START CAMERA
-                |--------------------------------------------------------------------------
-                */
-
-                btnStart.addEventListener(
-                    'click',
-                    async function() {
-
-                        if (!outlet.value) {
-
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Pilih Outlet',
-                                text: 'Silakan pilih outlet terlebih dahulu.'
-                            });
-
-                            return;
-
-                        }
+            });
 
 
-                        try {
+            /*
+            |--------------------------------------------------------------------------
+            | START QR SCANNER
+            |--------------------------------------------------------------------------
+            */
 
-                            stream =
-                                await navigator.mediaDevices
-                                .getUserMedia({
-                                    video: {
-                                        facingMode: {
-                                            ideal: 'environment'
-                                        }
-                                    },
-                                    audio: false
-                                });
+            function startCamera() {
 
-
-                            video.srcObject = stream;
-
-
-                            btnStart.classList.add(
-                                'd-none'
-                            );
-
-                            btnStop.classList.remove(
-                                'd-none'
-                            );
-
-
-                            status.innerHTML =
-                                '<span class="text-success">' +
-                                '<i data-feather="camera"></i> ' +
-                                'Camera aktif. Arahkan QR Code ke kamera.' +
-                                '</span>';
-
-
-                            if (window.feather) {
-                                feather.replace();
-                            }
-
-
-                            /*
-                             * Nanti QR scanner kita
-                             * sambungkan di sini.
-                             */
-
-                        } catch (error) {
-
-                            console.error(error);
-
-
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Camera Tidak Bisa Dibuka',
-                                text: 'Pastikan browser memiliki izin menggunakan kamera.'
-                            });
-
-                        }
-
-                    }
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | STOP CAMERA
-                |--------------------------------------------------------------------------
-                */
-
-                btnStop.addEventListener(
-                    'click',
-                    function() {
-
-                        stopCamera();
-
-                    }
-                );
-
-
-                function stopCamera() {
-
-                    if (stream) {
-
-                        stream
-                            .getTracks()
-                            .forEach(
-                                track => track.stop()
-                            );
-
-                        stream = null;
-
-                    }
-
-
-                    video.srcObject = null;
-
-
-                    btnStart.classList.remove(
-                        'd-none'
-                    );
-
-                    btnStop.classList.add(
-                        'd-none'
-                    );
-
-
-                    status.innerHTML =
-                        'Camera berhenti.';
-
+                if (scanning) {
+                    return;
                 }
 
+                qrScanner = new Html5Qrcode('cameraWrapper');
 
-                /*
-                |--------------------------------------------------------------------------
-                | OUTLET CHANGE
-                |--------------------------------------------------------------------------
-                */
+                scanning = true;
 
-                outlet.addEventListener(
-                    'change',
-                    function() {
+                $('#btnStartCamera').addClass('d-none');
+                $('#btnStopCamera').removeClass('d-none');
 
-                        if (!this.value) {
+                $('#cameraStatus')
+                    .removeClass('text-muted text-danger')
+                    .addClass('text-success')
+                    .text('Camera aktif. Arahkan QR Code ke kamera.');
 
-                            stopCamera();
 
-                            status.innerHTML =
-                                'Pilih outlet terlebih dahulu.';
+                qrScanner.start(
 
-                            return;
+                    {
+                        facingMode: 'environment'
+                    },
 
+                    {
+                        fps: 10,
+
+                        qrbox: {
+                            width: 300,
+                            height: 150
                         }
 
+                    },
 
-                        status.innerHTML =
-                            'Outlet dipilih. Silakan mulai camera.';
+                    function(decodedText) {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | QR TERBACA
+                        |--------------------------------------------------------------------------
+                        */
+
+                        if (processing) {
+                            return;
+                        }
+
+                        processing = true;
+
+                        console.log(
+                            'QR:',
+                            decodedText
+                        );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | PAUSE SCANNER
+                        |--------------------------------------------------------------------------
+                        */
+
+                        qrScanner.pause(true);
+
+
+                        processScan(decodedText);
+
+                    },
+
+                    function(errorMessage) {
+
+                        // Tidak perlu melakukan apa-apa
+                        // selama QR belum terbaca
 
                     }
-                );
 
+                ).catch(function(error) {
 
-                /*
-                |--------------------------------------------------------------------------
-                | CLEANUP
-                |--------------------------------------------------------------------------
-                */
+                    console.error(error);
 
-                window.addEventListener(
-                    'beforeunload',
-                    function() {
+                    scanning = false;
 
-                        stopCamera();
+                    $('#btnStartCamera').removeClass('d-none');
+                    $('#btnStopCamera').addClass('d-none');
 
-                    }
-                );
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Camera Tidak Bisa Dibuka',
+                        text: 'Pastikan izin kamera sudah diberikan.',
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+
+                });
 
             }
 
-        );
+
+            /*
+            |--------------------------------------------------------------------------
+            | PROCESS SCAN
+            |--------------------------------------------------------------------------
+            */
+
+            function processScan(qrcode) {
+
+                let outletId = $('#outlet_id').val();
+
+
+                $.ajax({
+
+                    url: "{{ route('super.scan-records.scan') }}",
+
+                    type: 'POST',
+
+                    data: {
+
+                        _token: "{{ csrf_token() }}",
+
+                        outlet_id: outletId,
+
+                        qrcode: qrcode,
+
+                        scan_method: 'camera'
+
+                    },
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SUCCESS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    success: function(response) {
+
+                        Swal.fire({
+
+                            icon: 'success',
+
+                            title: 'Tiket Valid',
+
+                            text: response.message ||
+                                'Tiket berhasil diterima.',
+
+                            showConfirmButton: false,
+
+                            timer: 3000,
+
+                            timerProgressBar: true
+
+                        });
+
+
+                        $('#cameraStatus')
+                            .removeClass(
+                                'text-danger text-muted'
+                            )
+                            .addClass(
+                                'text-success'
+                            )
+                            .text(
+                                '✓ Tiket berhasil diterima.'
+                            );
+
+
+                        loadHistory();
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | LANJUT SCAN
+                        |--------------------------------------------------------------------------
+                        */
+
+                        setTimeout(function() {
+
+                            processing = false;
+
+                            if (
+                                qrScanner &&
+                                scanning
+                            ) {
+
+                                qrScanner.resume();
+
+                            }
+
+                        }, 1000);
+
+
+                    },
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ERROR
+                    |--------------------------------------------------------------------------
+                    */
+
+                    error: function(xhr) {
+
+                        let message =
+                            'Tiket tidak dapat diproses.';
+
+                        let title =
+                            'Scan Ditolak';
+
+
+                        if (
+                            xhr.responseJSON &&
+                            xhr.responseJSON.message
+                        ) {
+
+                            message =
+                                xhr.responseJSON.message;
+
+                        }
+
+
+                        if (xhr.status === 404) {
+
+                            title =
+                                'Tiket Tidak Ditemukan';
+
+                        }
+
+
+                        if (xhr.status === 422) {
+
+                            title =
+                                'Tiket Sudah Digunakan';
+
+                        }
+
+
+                        if (xhr.status === 403) {
+
+                            title =
+                                'Akses Ditolak';
+
+                        }
+
+
+                        Swal.fire({
+
+                            icon: 'error',
+
+                            title: title,
+
+                            text: message,
+
+                            showConfirmButton: false,
+
+                            timer: 3000,
+
+                            timerProgressBar: true
+
+                        });
+
+
+                        $('#cameraStatus')
+                            .removeClass(
+                                'text-success text-muted'
+                            )
+                            .addClass(
+                                'text-danger'
+                            )
+                            .text(
+                                '✕ ' + message
+                            );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | SCAN LAGI
+                        |--------------------------------------------------------------------------
+                        */
+
+                        setTimeout(function() {
+
+                            processing = false;
+
+                            if (
+                                qrScanner &&
+                                scanning
+                            ) {
+
+                                qrScanner.resume();
+
+                            }
+
+                        }, 1000);
+
+                    }
+
+                });
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | STOP CAMERA
+            |--------------------------------------------------------------------------
+            */
+
+            $('#btnStopCamera').on('click', function() {
+
+                stopCamera();
+
+            });
+
+
+            function stopCamera() {
+
+                if (!qrScanner) {
+                    return;
+                }
+
+                qrScanner.stop()
+                    .then(function() {
+
+                        qrScanner.clear();
+
+                        qrScanner = null;
+
+                        scanning = false;
+
+                        processing = false;
+
+                        $('#btnStartCamera')
+                            .removeClass('d-none');
+
+                        $('#btnStopCamera')
+                            .addClass('d-none');
+
+                        $('#cameraStatus')
+                            .removeClass(
+                                'text-success text-danger'
+                            )
+                            .addClass(
+                                'text-muted'
+                            )
+                            .text(
+                                'Camera berhenti.'
+                            );
+
+                    })
+                    .catch(function(error) {
+
+                        console.error(error);
+
+                    });
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | OUTLET CHANGE
+            |--------------------------------------------------------------------------
+            */
+
+            $('#outlet_id').on('change', function() {
+
+                if (!$(this).val()) {
+
+                    stopCamera();
+
+                    $('#cameraStatus')
+                        .text(
+                            'Pilih outlet terlebih dahulu.'
+                        );
+
+
+
+
+                    loadHistory();
+
+
+                    return;
+                }
+
+                $('#cameraStatus')
+                    .text(
+                        'Outlet dipilih. Silakan mulai camera.'
+                    );
+
+
+                loadHistory();
+
+            });
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLEANUP
+            |--------------------------------------------------------------------------
+            */
+
+            $(window).on('beforeunload', function() {
+
+                stopCamera();
+
+            });
+
+
+
+
+
+        });
+
+
+
+
+
+
+
+        function loadHistory() {
+
+            let outletId = $('#outlet_id').val();
+
+            let history = $('#scanHistory');
+
+            let historyOutlet = $('#historyOutlet');
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | BELUM PILIH OUTLET
+            |--------------------------------------------------------------------------
+            */
+
+            if (!outletId) {
+
+                history.html(`
+            <tr>
+                <td colspan="6"
+                    class="text-center text-muted py-4">
+
+                    Pilih outlet terlebih dahulu.
+
+                </td>
+            </tr>
+        `);
+
+                historyOutlet.text('-');
+
+                return;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | NAMA OUTLET
+            |--------------------------------------------------------------------------
+            */
+
+            let outletText = $('#outlet_id option:selected')
+                .text()
+                .trim();
+
+            historyOutlet.text(outletText);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | LOADING
+            |--------------------------------------------------------------------------
+            */
+
+            history.html(`
+        <tr>
+            <td colspan="6"
+                class="text-center text-muted py-4">
+
+                Memuat history...
+
+            </td>
+        </tr>
+    `);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | AJAX
+            |--------------------------------------------------------------------------
+            */
+
+            $.ajax({
+
+                url: "{{ route('super.scan-records.history') }}",
+
+                type: "GET",
+
+                data: {
+                    outlet_id: outletId
+                },
+
+                success: function(response) {
+
+                    history.empty();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | TIDAK ADA DATA
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        !response.data ||
+                        response.data.length === 0
+                    ) {
+
+                        history.html(`
+                    <tr>
+                        <td colspan="6"
+                            class="text-center text-muted py-4">
+
+                            Belum ada scan.
+
+                        </td>
+                    </tr>
+                `);
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DATA
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $.each(response.data, function(index, item) {
+
+                        let methodBadge;
+
+
+                        if (item.scan_method === 'scanner') {
+
+                            methodBadge = `
+                        <span class="badge bg-primary">
+                            Scanner
+                        </span>
+                    `;
+
+                        } else {
+
+                            methodBadge = `
+                        <span class="badge bg-success">
+                            Camera
+                        </span>
+                    `;
+
+                        }
+
+
+                        history.append(`
+
+                    <tr>
+
+                        <td>
+                            ${index + 1}
+                        </td>
+
+                        <td>
+                            <strong>
+                                ${item.qrcode ?? '-'}
+                            </strong>
+                        </td>
+
+                        <td>
+                            ${item.no_tiket ?? '-'}
+                        </td>
+
+                        <td>
+                            ${item.ticket_type ?? '-'}
+                        </td>
+
+                        <td>
+                            ${methodBadge}
+                        </td>
+
+                        <td>
+                            ${item.scanned_at ?? '-'}
+                        </td>
+
+                    </tr>
+
+                `);
+
+                    });
+
+                },
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ERROR
+                |--------------------------------------------------------------------------
+                */
+
+                error: function(xhr) {
+
+                    console.error(
+                        'History error:',
+                        xhr.responseJSON
+                    );
+
+                    history.html(`
+                <tr>
+                    <td colspan="6"
+                        class="text-center text-danger py-4">
+
+                        Gagal mengambil history scan.
+
+                    </td>
+                </tr>
+            `);
+
+                }
+
+            });
+
+        }
     </script>
 @endpush

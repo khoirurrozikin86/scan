@@ -62,6 +62,209 @@
 
     <link rel="shortcut icon" href="{{ asset('vendor/nobleui/assets/images/favicon.png') }}">
 
+
+
+
+    <style>
+        /* =========================================================
+   SIDEBAR - OSIL GREEN THEME
+   ========================================================= */
+
+        .sidebar {
+            background: #ffffff !important;
+            border-right: 1px solid #e5eee8;
+        }
+
+
+        /* =========================================================
+   SIDEBAR LOGO / BRAND
+   ========================================================= */
+
+        .sidebar .sidebar-header {
+            background: #ffffff;
+            border-bottom: 1px solid #edf4ef;
+        }
+
+
+        /* =========================================================
+   CATEGORY
+   ========================================================= */
+
+        .sidebar .nav-category {
+            color: #82a08e !important;
+
+            font-size: 10px;
+            font-weight: 700;
+
+            letter-spacing: .8px;
+
+            padding-left: 20px;
+        }
+
+
+        /* =========================================================
+   MENU DEFAULT
+   ========================================================= */
+
+        .sidebar .nav-link {
+            color: #52665a !important;
+
+            border-radius: 10px;
+
+            margin: 3px 10px;
+
+            padding: 10px 13px;
+
+            transition:
+                background .2s ease,
+                color .2s ease,
+                transform .2s ease;
+        }
+
+
+        /* ICON DEFAULT */
+
+        .sidebar .nav-link .link-icon {
+            color: #789084 !important;
+
+            width: 18px;
+            height: 18px;
+
+            margin-right: 10px;
+
+            transition: color .2s ease;
+        }
+
+
+        /* =========================================================
+   HOVER
+   ========================================================= */
+
+        .sidebar .nav-link:hover {
+
+            background: #f0fdf4 !important;
+
+            color: #15803d !important;
+
+            transform: translateX(2px);
+        }
+
+        .sidebar .nav-link:hover .link-icon {
+
+            color: #15803d !important;
+        }
+
+
+        /* =========================================================
+   ACTIVE MENU
+   ========================================================= */
+
+        .sidebar .nav-link.active {
+
+            background:
+                linear-gradient(135deg,
+                    #dcfce7,
+                    #d1fae5) !important;
+
+            color: #15803d !important;
+
+            font-weight: 700;
+
+            box-shadow:
+                0 4px 12px rgba(21, 128, 61, .08);
+        }
+
+
+        .sidebar .nav-link.active .link-icon {
+
+            color: #15803d !important;
+        }
+
+
+        /* =========================================================
+   ARROW
+   ========================================================= */
+
+        .sidebar .link-arrow {
+
+            color: #8aa095 !important;
+
+            transition:
+                transform .2s ease,
+                color .2s ease;
+        }
+
+
+        .sidebar .nav-link:hover .link-arrow {
+
+            color: #15803d !important;
+        }
+
+
+        /* =========================================================
+   SUB MENU
+   ========================================================= */
+
+        .sidebar .sub-menu {
+
+            margin-left: 15px;
+
+            border-left:
+                1px solid #dcebe1;
+        }
+
+
+        .sidebar .sub-menu .nav-link {
+
+            margin-top: 2px;
+            margin-bottom: 2px;
+
+            padding-top: 8px;
+            padding-bottom: 8px;
+
+            font-size: 12px;
+        }
+
+
+        /* ACTIVE SUB MENU */
+
+        .sidebar .sub-menu .nav-link.active {
+
+            background: #f0fdf4 !important;
+
+            color: #15803d !important;
+
+            box-shadow: none;
+        }
+
+
+        /* =========================================================
+   SIDEBAR SCROLLBAR
+   ========================================================= */
+
+        .sidebar::-webkit-scrollbar {
+
+            width: 5px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+
+            background: transparent;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+
+            background: #d1fae5;
+
+            border-radius: 10px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+
+            background: #86efac;
+        }
+    </style>
+
 </head>
 
 

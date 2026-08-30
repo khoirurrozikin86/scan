@@ -20,6 +20,65 @@
         </div>
 
 
+
+        <div class="card mb-4">
+
+            <div class="card-body">
+
+                <div class="row align-items-end">
+
+                    <div class="col-md-4">
+
+                        <label for="date_from" class="form-label">
+                            Dari Tanggal
+                        </label>
+
+                        <input type="date" id="date_from" class="form-control" value="{{ now()->format('Y-m-d') }}">
+
+                    </div>
+
+
+                    <div class="col-md-4">
+
+                        <label for="date_to" class="form-label">
+                            Sampai Tanggal
+                        </label>
+
+                        <input type="date" id="date_to" class="form-control" value="{{ now()->format('Y-m-d') }}">
+
+                    </div>
+
+
+                    <div class="col-md-4">
+
+                        <div class="d-flex gap-2">
+
+                            <button type="button" id="btnFilter" class="btn btn-primary">
+
+                                <i data-feather="search"></i>
+                                Tampilkan
+
+                            </button>
+
+
+                            <button type="button" id="btnExport" class="btn btn-success">
+
+                                <i data-feather="download"></i>
+                                Export Excel
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
         <div class="card">
 
             <div class="card-body">
@@ -52,6 +111,8 @@
                                     Outlet
                                 </th>
 
+                                <th>Outlet Type</th>
+
                                 <th>
                                     Method
                                 </th>
@@ -61,7 +122,7 @@
                                 </th>
 
                                 <th>
-                                    Remark
+                                    Action
                                 </th>
 
                             </tr>
@@ -85,79 +146,316 @@
 
 @push('scripts')
     <script>
-        document.addEventListener(
-            'DOMContentLoaded',
-            function() {
+        /*
+                                                        |--------------------------------------------------------------------------
+                                                        | DATATABLE
+                                                        |--------------------------------------------------------------------------
+                                                        */
 
-                if (window.feather) {
-                    feather.replace();
+        let table;
+
+
+        $(document).ready(function() {
+
+            /*
+            |--------------------------------------------------------------------------
+            | FEATHER
+            |--------------------------------------------------------------------------
+            */
+
+            if (window.feather) {
+                feather.replace();
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DATATABLE
+            |--------------------------------------------------------------------------
+            */
+
+            table = $('#scanRecordsTable').DataTable({
+
+                processing: true,
+
+                serverSide: true,
+
+                responsive: false,
+
+                autoWidth: false,
+
+                ajax: {
+
+                    url: "{{ route('super.scan-records.dt') }}",
+
+                    data: function(d) {
+
+                        d.date_from = $('#date_from').val();
+
+                        d.date_to = $('#date_to').val();
+
+                    }
+
+                },
+
+                columns: [
+
+                    {
+                        data: 'no_tiket',
+                        name: 'no_tiket'
+                    },
+
+                    {
+                        data: 'qrcode',
+                        name: 'qrcode'
+                    },
+
+                    {
+                        data: 'ticket_type',
+                        name: 'ticket_type'
+                    },
+
+                    {
+                        data: 'user_name',
+                        name: 'user.name'
+                    },
+
+                    {
+                        data: 'outlet_name',
+                        name: 'outlet.outlet_name'
+                    },
+
+                    {
+                        data: 'outlet_type',
+                        name: 'outlet.outlet_type'
+                    },
+
+                    {
+                        data: 'scan_method',
+                        name: 'scan_method'
+                    },
+
+                    {
+                        data: 'scanned_at',
+                        name: 'scanned_at'
+                    },
+
+                    {
+                        data: 'action',
+                        name: 'action',
+                        orderable: false,
+                        searchable: false
+                    }
+
+                ],
+
+                order: [
+                    [6, 'desc']
+                ]
+
+            });
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | FILTER
+            |--------------------------------------------------------------------------
+            */
+
+            $('#btnFilter').on('click', function() {
+
+                let dateFrom = $('#date_from').val();
+
+                let dateTo = $('#date_to').val();
+
+
+                if (!dateFrom || !dateTo) {
+
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Tanggal belum lengkap',
+                        text: 'Silakan pilih tanggal dari dan sampai.'
+                    });
+
+                    return;
                 }
 
 
-                $('#scanRecordsTable').DataTable({
+                if (dateFrom > dateTo) {
 
-                    processing: true,
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Tanggal tidak valid',
+                        text: 'Dari tanggal tidak boleh lebih besar dari sampai tanggal.'
+                    });
 
-                    serverSide: true,
+                    return;
+                }
 
-                    responsive: false,
 
-                    autoWidth: false,
+                /*
+                |--------------------------------------------------------------------------
+                | RELOAD DATATABLE
+                |--------------------------------------------------------------------------
+                */
 
-                    ajax: '{{ route('super.scan-records.dt') }}',
+                table.ajax.reload(null, false);
 
-                    columns: [
+            });
 
-                        {
-                            data: 'no_tiket',
-                            name: 'no_tiket'
-                        },
 
-                        {
-                            data: 'qrcode',
-                            name: 'qrcode'
-                        },
+            /*
+            |--------------------------------------------------------------------------
+            | DELETE
+            |--------------------------------------------------------------------------
+            */
 
-                        {
-                            data: 'ticket_type',
-                            name: 'ticket_type'
-                        },
+            $(document).on(
+                'click',
+                '.btn-delete-scan',
+                function() {
 
-                        {
-                            data: 'user_name',
-                            name: 'user.name'
-                        },
+                    let url = $(this).attr('data-url');
 
-                        {
-                            data: 'outlet_name',
-                            name: 'outlet.outlet_name'
-                        },
 
-                        {
-                            data: 'scan_method',
-                            name: 'scan_method'
-                        },
+                    if (!url) {
 
-                        {
-                            data: 'scanned_at',
-                            name: 'scanned_at'
-                        },
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'URL delete tidak ditemukan.'
+                        });
 
-                        {
-                            data: 'remark',
-                            name: 'remark'
+                        return;
+                    }
+
+
+                    Swal.fire({
+
+                        icon: 'warning',
+
+                        title: 'Hapus Scan?',
+
+                        text: 'Data scan ini akan dihapus.',
+
+                        showCancelButton: true,
+
+                        confirmButtonText: 'Ya, Hapus',
+
+                        cancelButtonText: 'Batal',
+
+                        confirmButtonColor: '#d33',
+
+                    }).then(function(result) {
+
+                        if (!result.isConfirmed) {
+                            return;
                         }
 
-                    ],
 
-                    order: [
-                        [6, 'desc']
-                    ]
+                        $.ajax({
 
+                            url: url,
+
+                            type: 'DELETE',
+
+                            data: {
+                                _token: "{{ csrf_token() }}"
+                            },
+
+
+                            success: function(response) {
+
+                                Swal.fire({
+
+                                    icon: 'success',
+
+                                    title: 'Berhasil',
+
+                                    text: response.message ||
+                                        'Data scan berhasil dihapus.',
+
+                                    showConfirmButton: false,
+
+                                    timer: 1800
+
+                                });
+
+
+                                /*
+                                |--------------------------------------------------------------------------
+                                | RELOAD
+                                |--------------------------------------------------------------------------
+                                */
+
+                                table.ajax.reload(
+                                    null,
+                                    false
+                                );
+
+                            },
+
+
+                            error: function(xhr) {
+
+                                Swal.fire({
+
+                                    icon: 'error',
+
+                                    title: 'Gagal',
+
+                                    text: xhr.responseJSON?.message ||
+                                        'Data scan gagal dihapus.'
+
+                                });
+
+                            }
+
+                        });
+
+                    });
+
+                }
+
+            );
+
+        });
+
+
+
+        $('#btnExport').on('click', function() {
+
+            let dateFrom = $('#date_from').val();
+            let dateTo = $('#date_to').val();
+
+            if (!dateFrom || !dateTo) {
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Tanggal belum lengkap',
+                    text: 'Silakan pilih tanggal terlebih dahulu.'
                 });
 
+                return;
             }
 
-        );
+            if (dateFrom > dateTo) {
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Tanggal tidak valid',
+                    text: 'Dari tanggal tidak boleh lebih besar dari sampai tanggal.'
+                });
+
+                return;
+            }
+
+            let url = "{{ route('super.scan-records.export') }}" +
+                "?date_from=" + encodeURIComponent(dateFrom) +
+                "&date_to=" + encodeURIComponent(dateTo);
+
+            window.location.href = url;
+
+        });
     </script>
 @endpush

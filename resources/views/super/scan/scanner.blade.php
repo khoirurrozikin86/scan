@@ -302,6 +302,17 @@
                             </td>
 
                             <td>
+                                ${item.ticket_type ?? '-'}
+                            </td>
+
+                            <td>
+                                ${item.scan_method === 'scanner'
+                                    ? '<span class="badge bg-primary">Scanner</span>'
+                                    : '<span class="badge bg-success">Camera</span>'
+                                }
+                            </td>
+
+                            <td>
                                 ${item.scanned_at ?? '-'}
                             </td>
 
@@ -652,6 +663,7 @@
 
 
                             timer: 1800,
+                            timerProgressBar: true,
 
                             confirmButtonText: 'OK'
 
@@ -892,5 +904,95 @@
 
             });
         }
+
+
+
+
+
+
+        let scanBuffer = '';
+        let scanTimer = null;
+        let lastKeyTime = 0;
+
+        $(document).on('keydown', function(e) {
+
+            const now = Date.now();
+
+            // Abaikan tombol kontrol
+            if (
+                e.key === 'Shift' ||
+                e.key === 'Control' ||
+                e.key === 'Alt' ||
+                e.key === 'Meta'
+            ) {
+                return;
+            }
+
+            // ENTER = scanner selesai mengirim barcode
+            if (e.key === 'Enter') {
+
+                e.preventDefault();
+
+                if (!scanBuffer) {
+                    return;
+                }
+
+                let qrcode = scanBuffer;
+
+                scanBuffer = '';
+
+                clearTimeout(scanTimer);
+
+                $('#barcodeInput').val('');
+
+                // proses scan
+                processScan(qrcode);
+
+                return;
+            }
+
+            // hanya karakter
+            if (e.key.length !== 1) {
+                return;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | DETEKSI KECEPATAN SCANNER
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                lastKeyTime > 0 &&
+                (now - lastKeyTime) > 100
+            ) {
+
+                // terlalu lambat → dianggap ketikan manual
+                scanBuffer = '';
+
+            }
+
+            lastKeyTime = now;
+
+            scanBuffer += e.key;
+
+            $('#barcodeInput').val(scanBuffer);
+
+            /*
+            |--------------------------------------------------------------------------
+            | RESET
+            |--------------------------------------------------------------------------
+            */
+
+            clearTimeout(scanTimer);
+
+            scanTimer = setTimeout(function() {
+
+                scanBuffer = '';
+                $('#barcodeInput').val('');
+
+            }, 300);
+
+        });
     </script>
 @endpush
