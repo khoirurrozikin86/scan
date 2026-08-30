@@ -1,0 +1,25 @@
+buat dto
+
+php artisan make:dto PortfolioData --module=Portfolio \
+  --fields="title:string,summary:?string,tags:?string,thumb:?file,order:?int" \
+  --from-request
+
+
+
+buat service
+
+php artisan make:service PortfolioService --module=Portfolio --dto=PortfolioData --model=PortfolioItem
+
+
+buat domain
+
+php artisan make:domain Portfolio \
+  --fields="title:string,summary:?string,tags:?string,thumb:?file,order:?int" \
+  --with-model
+
+
+all
+
+php artisan make:dto SettingData --module=Setting --fields="key:string,value:string,type:?string" --from-request
+php artisan make:service SettingService --module=Setting --dto=SettingData --model=Setting
+php artisan make:domain Contact --fields="name:string,email:string,message:string"
