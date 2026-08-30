@@ -9,13 +9,7 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Register any application services.
      */
-    public function register(): void
-    {
-        $this->app->bind(
-            \App\Domain\Monitoring\Services\MikrotikClientInterface::class,
-            \App\Domain\Monitoring\Services\MikrotikRouterosClient::class
-        );
-    }
+    public function register(): void {}
 
     /**
      * Bootstrap any application services.

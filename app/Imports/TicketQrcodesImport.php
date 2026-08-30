@@ -4,64 +4,87 @@ namespace App\Imports;
 
 use App\Models\TicketQrcode;
 use Illuminate\Support\Collection;
-
-use Maatwebsite\Excel\Concerns\{
-    ToCollection,
-    WithHeadingRow,
-    WithValidation
-};
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithValidation;
 
 class TicketQrcodesImport implements
     ToCollection,
     WithHeadingRow,
     WithValidation
 {
-    public function collection(Collection $rows): void
+    public function collection(Collection $rows)
     {
-        foreach ($rows as $row) {
+        DB::transaction(function () use ($rows) {
 
-            $noTiket = trim(
-                (string) ($row['no_tiket'] ?? '')
-            );
+            foreach ($rows as $row) {
 
-            $qrcode = trim(
-                (string) ($row['qrcode'] ?? '')
-            );
+                $noTiket = trim(
+                    (string) ($row['no_tiket'] ?? '')
+                );
 
-            $ticketType = trim(
-                (string) ($row['ticket_type'] ?? '')
-            );
+                $qrcode = trim(
+                    (string) ($row['qrcode'] ?? '')
+                );
 
-            if (
-                $noTiket === '' ||
-                $qrcode === '' ||
-                $ticketType === ''
-            ) {
-                continue;
-            }
+                $ticketType = trim(
+                    (string) ($row['ticket_type'] ?? '')
+                );
 
-            TicketQrcode::updateOrCreate(
-                [
-                    'no_tiket' => $noTiket,
-                ],
-                [
-                    'qrcode' => $qrcode,
+                $remark = isset($row['remark'])
+                    ? trim((string) $row['remark'])
+                    : null;
 
+
+                /*
+                 * Cek no tiket
+                 */
+                if (
+                    TicketQrcode::where(
+                        'no_tiket',
+                        $noTiket
+                    )->exists()
+                ) {
+                    throw new \Exception(
+                        "No tiket {$noTiket} sudah terdaftar."
+                    );
+                }
+
+
+                /*
+                 * Cek QR Code
+                 */
+                if (
+                    TicketQrcode::where(
+                        'qrcode',
+                        $qrcode
+                    )->exists()
+                ) {
+                    throw new \Exception(
+                        "QR Code {$qrcode} sudah terdaftar."
+                    );
+                }
+
+
+                /*
+                 * Insert
+                 */
+                TicketQrcode::create([
+                    'no_tiket'    => $noTiket,
+                    'qrcode'      => $qrcode,
                     'ticket_type' => $ticketType,
-
-                    'remark' => !empty($row['remark'])
-                        ? trim(
-                            (string) $row['remark']
-                        )
-                        : null,
-                ]
-            );
-        }
+                    'remark'      => $remark,
+                ]);
+            }
+        });
     }
+
 
     public function rules(): array
     {
         return [
+
             'no_tiket' => [
                 'required',
             ],
@@ -77,6 +100,7 @@ class TicketQrcodesImport implements
             'remark' => [
                 'nullable',
             ],
+
         ];
     }
 }

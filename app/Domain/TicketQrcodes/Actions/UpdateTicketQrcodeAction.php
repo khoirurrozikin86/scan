@@ -1,24 +1,26 @@
 <?php
 
-namespace App\Domain\Outlets\Actions;
+namespace App\Domain\TicketQrcodes\Actions;
 
-use App\Domain\Outlets\DTOs\OutletData;
-use App\Models\Outlet;
+use App\Domain\TicketQrcodes\DTOs\TicketQrcodeData;
+use App\Models\TicketQrcode;
 use Illuminate\Support\Facades\DB;
 
-class UpdateOutletAction
+class UpdateTicketQrcodeAction
 {
     public function __invoke(
-        Outlet $outlet,
-        OutletData $data
-    ): Outlet {
-        return DB::transaction(function () use ($outlet, $data) {
-
-            $outlet->update(
+        TicketQrcode $ticketQrcode,
+        TicketQrcodeData $data
+    ): TicketQrcode {
+        return DB::transaction(function () use (
+            $ticketQrcode,
+            $data
+        ) {
+            $ticketQrcode->update(
                 $data->toArray()
             );
 
-            return $outlet->refresh();
+            return $ticketQrcode->refresh();
         });
     }
 }

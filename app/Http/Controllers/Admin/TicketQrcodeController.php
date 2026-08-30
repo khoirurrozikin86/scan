@@ -14,9 +14,11 @@ use App\Domain\TicketQrcodes\Queries\TicketQrcodeTableQuery;
 use App\Domain\TicketQrcodes\Services\TicketQrcodeService;
 
 use App\Imports\TicketQrcodesImport;
+use App\Exports\TicketQrcodesExport;
 use App\Models\TicketQrcode;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -27,7 +29,7 @@ class TicketQrcodeController extends Controller
     public function index()
     {
         return view(
-            'super.ticket-qrcodes.index'
+            'super.ticket-qrcode.index'
         );
     }
 
@@ -60,13 +62,11 @@ class TicketQrcodeController extends Controller
 
                         [
                             'type' => 'edit',
-
                             'label' => 'Edit',
-
                             'icon' => 'edit-2',
 
                             'update_url' => route(
-                                'super.ticket-qrcodes.update',
+                                'super.ticket-qrcode.update',
                                 $c->getRouteKey()
                             ),
 
@@ -83,17 +83,13 @@ class TicketQrcodeController extends Controller
                             'type' => 'delete',
 
                             'url' => route(
-                                'super.ticket-qrcodes.destroy',
+                                'super.ticket-qrcode.destroy',
                                 $c->getRouteKey()
                             ),
 
                             'label' => 'Delete',
-
                             'icon' => 'trash-2',
-
-                            'confirm' =>
-                            "Delete Ticket {$c->no_tiket}?",
-
+                            'confirm' => "Delete Ticket {$c->no_tiket}?",
                             'disabled' => false,
                         ],
 
@@ -106,10 +102,7 @@ class TicketQrcodeController extends Controller
                 }
             )
 
-            ->rawColumns([
-                'actions'
-            ])
-
+            ->rawColumns(['actions'])
             ->toJson();
     }
 
@@ -181,7 +174,7 @@ class TicketQrcodeController extends Controller
 
             : redirect()
             ->route(
-                'super.ticket-qrcodes.index'
+                'super.ticket-qrcode.index'
             )
             ->with(
                 'success',
@@ -189,28 +182,42 @@ class TicketQrcodeController extends Controller
             );
     }
 
-    public function import(
-        TicketQrcodeImportRequest $request
-    ) {
-        DB::transaction(function () use ($request) {
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => [
+                'required',
+                'file',
+                'mimes:xlsx,xls',
+            ],
+        ]);
+
+
+        try {
 
             Excel::import(
-                new TicketQrcodesImport(),
+                new TicketQrcodesImport,
                 $request->file('file')
             );
-        });
 
-        return $request->ajax() ||
-            $request->expectsJson()
 
-            ? response()->json([
+            return response()->json([
                 'message' =>
-                'Ticket QR Code imported successfully',
-            ])
-
-            : back()->with(
-                'success',
                 'Ticket QR Code imported successfully'
-            );
+            ]);
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function export()
+    {
+        return Excel::download(
+            new TicketQrcodesExport,
+            'ticket-qrcodes.xlsx'
+        );
     }
 }

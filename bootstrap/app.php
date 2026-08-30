@@ -17,6 +17,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+
+        // User yang sudah login tidak boleh kembali ke /login
+        $middleware->redirectUsersTo(
+            fn() => route('super.dashboard')
+        );
+
+        // User yang belum login diarahkan ke /login
+        $middleware->redirectGuestsTo(
+            fn() => route('login')
+        );
     })
 
     ->withCommands([

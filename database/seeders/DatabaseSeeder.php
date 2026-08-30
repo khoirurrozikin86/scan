@@ -25,6 +25,9 @@ class DatabaseSeeder extends Seeder
             UsersAndPermissionsSeeder::class,
             OutletSeeder::class,
             TicketQrcodeSeeder::class,
+
+
+
         ]);
     }
 }

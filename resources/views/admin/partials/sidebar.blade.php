@@ -96,7 +96,7 @@
 
 
             {{-- ================= MASTER ================= --}}
-            @canany(['outlets.view', 'tickets.view'])
+            @canany(['outlets.view', 'ticket-qrcodes.view'])
                 <li class="nav-item nav-category">MASTER</li>
             @endcanany
 
@@ -123,20 +123,20 @@
             @endcan
 
 
-            @can('ticket-qrcodes.view')
+            @can('ticket-qrcode.view')
                 <li class="nav-item">
-                    <a class="nav-link" data-bs-toggle="collapse" href="#menu-ticket-qrcodes" role="button"
-                        aria-expanded="false" aria-controls="menu-ticket-qrcodes">
+                    <a class="nav-link" data-bs-toggle="collapse" href="#menu-ticket-qrcode" role="button"
+                        aria-expanded="false" aria-controls="menu-ticket-qrcode">
                         <i class="link-icon" data-feather="hard-drive"></i>
-                        <span class="link-title">Ticket Qrcodes</span>
+                        <span class="link-title">Ticket Qrcode</span>
                         <i class="link-arrow" data-feather="chevron-down"></i>
                     </a>
-                    <div class="collapse {{ request()->routeIs('super.ticket-qrcodes.*') ? 'show' : '' }}"
-                        id="menu-ticket-qrcodes">
+                    <div class="collapse {{ request()->routeIs('super.ticket-qrcode.*') ? 'show' : '' }}"
+                        id="menu-ticket-qrcode">
                         <ul class="nav sub-menu">
                             <li class="nav-item">
-                                <a href="{{ route('super.ticket-qrcodes.index') }}"
-                                    class="nav-link {{ request()->routeIs('super.ticket-qrcodes.index') ? 'active' : '' }}">
+                                <a href="{{ route('super.ticket-qrcode.index') }}"
+                                    class="nav-link {{ request()->routeIs('super.ticket-qrcode.index') ? 'active' : '' }}">
                                     Show
                                 </a>
                             </li>
@@ -148,7 +148,7 @@
 
 
             {{-- ================= SETTINGS ================= --}}
-            @canany(['outlets.view', 'ticket-qrcodes.view'])
+            @canany(['outlets.view', 'ticket-qrcode.view'])
                 <li class="nav-item nav-category">SCAN MANAGEMENT</li>
             @endcanany
 
