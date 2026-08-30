@@ -8,6 +8,8 @@ use Illuminate\Notifications\Notifiable;
 // ⬇️ penting
 use Spatie\Permission\Traits\HasRoles;
 
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasRoles; // ⬅️ penting
@@ -37,8 +39,22 @@ class User extends Authenticatable
         return $this->hasRole('super_admin');
     }
 
-    public function server()
+
+
+    public function outlets(): BelongsToMany
     {
-        return $this->belongsTo(Server::class);
+        return $this->belongsToMany(
+            Outlet::class,
+            'user_outlets',
+            'user_id',
+            'outlet_id'
+        );
+    }
+
+    public function scanRecords()
+    {
+        return $this->hasMany(
+            ScanRecord::class
+        );
     }
 }

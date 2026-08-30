@@ -18,4 +18,12 @@ class TicketQrcode extends Model
         'ticket_type',
         'remark',
     ];
+
+    public function scanRecords()
+    {
+        return $this->hasMany(
+            ScanRecord::class,
+            'ticket_qrcode_id'
+        );
+    }
 }

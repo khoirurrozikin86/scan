@@ -40,6 +40,20 @@ class OutletController extends Controller
                     : 'Not Active'
             )
 
+            ->editColumn(
+                'is_camera_enabled',
+                fn(Outlet $outlet) => $outlet->is_camera_enabled
+                    ? 'Enabled'
+                    : 'Disabled'
+            )
+
+            ->editColumn(
+                'is_scanner_enabled',
+                fn(Outlet $outlet) => $outlet->is_scanner_enabled
+                    ? 'Enabled'
+                    : 'Disabled'
+            )
+
             ->addColumn('actions', function (Outlet $outlet) {
 
                 $actions = [
@@ -63,6 +77,9 @@ class OutletController extends Controller
                             'outlet_name' => $outlet->outlet_name,
                             'outlet_type' => $outlet->outlet_type,
                             'is_active'   => $outlet->is_active,
+                            'is_camera_enabled' => $outlet->is_camera_enabled,
+                            'is_scanner_enabled' => $outlet->is_scanner_enabled,
+                            'remark' => $outlet->remark,
                         ],
                     ],
 

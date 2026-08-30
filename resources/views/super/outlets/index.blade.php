@@ -50,6 +50,8 @@
                                     <th>Name</th>
                                     <th>type</th>
                                     <th>status</th>
+                                    <th>Camera</th>
+                                    <th>Scanner</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -135,6 +137,58 @@
                             </select>
 
                             <div class="invalid-feedback" id="is_activeErr"></div>
+                        </div>
+
+                        <div class="row">
+
+                            <div class="col-md-6">
+
+                                <div class="form-check form-switch mb-3">
+
+                                    {{-- Nilai 0 jika checkbox tidak dicentang --}}
+                                    <input type="hidden" name="is_camera_enabled" value="0">
+
+                                    <input class="form-check-input" type="checkbox" id="is_camera_enabled"
+                                        name="is_camera_enabled" value="1" checked>
+
+                                    <label class="form-check-label" for="is_camera_enabled">
+                                        Camera Scan
+                                    </label>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="col-md-6">
+
+                                <div class="form-check form-switch mb-3">
+
+                                    {{-- Nilai 0 jika checkbox tidak dicentang --}}
+                                    <input type="hidden" name="is_scanner_enabled" value="0">
+
+                                    <input class="form-check-input" type="checkbox" id="is_scanner_enabled"
+                                        name="is_scanner_enabled" value="1" checked>
+
+                                    <label class="form-check-label" for="is_scanner_enabled">
+                                        Barcode Scanner
+                                    </label>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="mb-3">
+
+                            <label for="remark" class="form-label">
+                                Remark
+                            </label>
+
+                            <textarea class="form-control" id="remark" name="remark" rows="3" placeholder="Catatan outlet..."></textarea>
+
                         </div>
 
 
@@ -329,6 +383,16 @@
                     //     data: 'updated_at',
                     //     name: 'updated_at'
                     // },
+
+                    {
+                        data: 'is_camera_enabled',
+                        name: 'is_camera_enabled'
+                    },
+                    {
+                        data: 'is_scanner_enabled',
+                        name: 'is_scanner_enabled'
+                    },
+
                     {
                         data: 'actions',
                         name: 'actions',
@@ -349,6 +413,15 @@
 
                 $form[0].reset();
 
+                // Default outlet baru
+                $isActive.val('1');
+
+                $('#is_camera_enabled').prop('checked', true);
+
+                $('#is_scanner_enabled').prop('checked', true);
+
+                $('#remark').val('');
+
                 $form
                     .data('mode', 'create')
                     .data(
@@ -360,7 +433,6 @@
 
                 bsModal.show();
             });
-
             $(document).on('click', '.btn-edit-role', function() {
 
                 clearErrors();
@@ -393,6 +465,25 @@
                 $outletName.val(payload.outlet_name || '');
                 $outletType.val(payload.outlet_type || '');
                 $isActive.val(payload.is_active ? '1' : '0');
+
+                // Camera
+                $('#is_camera_enabled').prop(
+                    'checked',
+                    payload.is_camera_enabled == 1 ||
+                    payload.is_camera_enabled === true
+                );
+
+                // Scanner
+                $('#is_scanner_enabled').prop(
+                    'checked',
+                    payload.is_scanner_enabled == 1 ||
+                    payload.is_scanner_enabled === true
+                );
+
+                // Remark
+                $('#remark').val(
+                    payload.remark || ''
+                );
 
 
                 bsModal.show();

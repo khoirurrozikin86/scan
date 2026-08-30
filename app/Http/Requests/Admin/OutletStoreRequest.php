@@ -38,11 +38,30 @@ class OutletStoreRequest extends FormRequest
                 'required',
                 'boolean',
             ],
+
+            'is_camera_enabled' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'is_scanner_enabled' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'remark' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+
         ];
     }
 
     public function sanitized(): array
     {
+
+
         return $this->validated();
     }
 }

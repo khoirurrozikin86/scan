@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\{
     DashboardController,
     OutletController,
     TicketQrcodeController,
+    UserOutletController,
+    ScanController,
 };
 
 Route::middleware(['auth'])
@@ -89,44 +91,109 @@ Route::middleware(['auth'])
             ->name('outlets.export');
 
 
-
         Route::prefix('ticket-qrcode')
             ->name('ticket-qrcode.')
             ->group(function () {
 
+                // VIEW
+                Route::middleware('permission:ticket-qrcode.view')
+                    ->get('/', [TicketQrcodeController::class, 'index'])
+                    ->name('index');
+
+                Route::middleware('permission:ticket-qrcode.view')
+                    ->get('/dt', [TicketQrcodeController::class, 'dt'])
+                    ->name('dt');
+
+                // CREATE
+                Route::middleware('permission:ticket-qrcode.create')
+                    ->post('/', [TicketQrcodeController::class, 'store'])
+                    ->name('store');
+
+                // UPDATE
+                Route::middleware('permission:ticket-qrcode.update')
+                    ->put('/{ticketQrcode}', [TicketQrcodeController::class, 'update'])
+                    ->name('update');
+
+                // DELETE
+                Route::middleware('permission:ticket-qrcode.delete')
+                    ->delete('/{ticketQrcode}', [TicketQrcodeController::class, 'destroy'])
+                    ->name('destroy');
+
+                // IMPORT = CREATE
+                Route::middleware('permission:ticket-qrcode.create')
+                    ->post('/import', [TicketQrcodeController::class, 'import'])
+                    ->name('import');
+
+                // EXPORT = VIEW
+                Route::middleware('permission:ticket-qrcode.view')
+                    ->get('/export', [TicketQrcodeController::class, 'export'])
+                    ->name('export');
+            });
+
+
+
+        Route::prefix('user-outlets')
+            ->name('user-outlets.')
+            ->group(function () {
+
+                // VIEW
+                Route::middleware('permission:user-outlets.view')
+                    ->get(
+                        '/',
+                        [UserOutletController::class, 'index']
+                    )
+                    ->name('index');
+
+                Route::middleware('permission:user-outlets.view')
+                    ->get(
+                        '/{user}/edit',
+                        [UserOutletController::class, 'edit']
+                    )
+                    ->name('edit');
+
+                // UPDATE
+                Route::middleware('permission:user-outlets.update')
+                    ->put(
+                        '/{user}',
+                        [UserOutletController::class, 'update']
+                    )
+                    ->name('update');
+            });
+
+
+
+
+        Route::prefix('scan')
+            ->name('scan-records.')
+            ->group(function () {
+
                 Route::get(
-                    '/',
-                    [TicketQrcodeController::class, 'index']
+                    '/camera',
+                    [ScanController::class, 'camera']
+                )->name('camera');
+
+                Route::get(
+                    '/scanner',
+                    [ScanController::class, 'scanner']
+                )->name('scanner');
+
+                Route::get(
+                    '/records',
+                    [ScanController::class, 'index']
                 )->name('index');
 
                 Route::get(
-                    '/dt',
-                    [TicketQrcodeController::class, 'dt']
+                    '/records/dt',
+                    [ScanController::class, 'dt']
                 )->name('dt');
 
-                Route::post(
-                    '/',
-                    [TicketQrcodeController::class, 'store']
-                )->name('store');
 
-                Route::put(
-                    '/{ticketQrcode}',
-                    [TicketQrcodeController::class, 'update']
-                )->name('update');
-
-                Route::delete(
-                    '/{ticketQrcode}',
-                    [TicketQrcodeController::class, 'destroy']
-                )->name('destroy');
-
-                Route::post(
-                    '/import',
-                    [TicketQrcodeController::class, 'import']
-                )->name('import');
+                Route::post('/scan', [ScanController::class, 'scan'])
+                    ->name('scan');
 
                 Route::get(
-                    '/export',
-                    [TicketQrcodeController::class, 'export']
-                )->name('export');
+                    '/history',
+                    [ScanController::class, 'history']
+                )->name('history');
             });
     });

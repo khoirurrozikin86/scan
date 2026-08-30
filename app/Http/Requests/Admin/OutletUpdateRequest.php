@@ -41,6 +41,22 @@ class OutletUpdateRequest extends FormRequest
                 'required',
                 'boolean',
             ],
+
+            'is_camera_enabled' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'is_scanner_enabled' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'remark' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
         ];
     }
 
