@@ -37,9 +37,6 @@
     <link rel="stylesheet" href="{{ asset('vendor/nobleui/assets/css/demo1/style.css') }}">
 
     <link rel="shortcut icon" href="{{ asset('vendor/nobleui/assets/images/favicon.png') }}" />
-
-
-
 </head>
 
 <body>
@@ -97,13 +94,13 @@
                                                 @enderror
                                             </div>
 
-                                            {{-- <div class="form-check mb-3">
+                                            <div class="form-check mb-3">
                                                 <input type="checkbox" class="form-check-input" id="remember_me"
                                                     name="remember">
                                                 <label class="form-check-label" for="remember_me">
                                                     Remember me
                                                 </label>
-                                            </div> --}}
+                                            </div>
 
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <button type="submit" class="btn btn-primary text-white">
@@ -158,9 +155,6 @@
     <script src="{{ asset('vendor/nobleui/assets/vendors/feather-icons/feather.min.js') }}"></script>
     <script src="{{ asset('vendor/nobleui/assets/js/template.js') }}"></script>
     <!-- endinject -->
-
-
-
 </body>
 
 </html>

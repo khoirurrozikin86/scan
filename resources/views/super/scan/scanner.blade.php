@@ -79,7 +79,7 @@
                             </label>
 
                             <input type="text" id="barcodeInput" class="form-control form-control-lg text-center"
-                                placeholder="Scan barcode tiket..." autocomplete="off" disabled>
+                                placeholder="Scan barcode tiket..." autocomplete="off" readonly disabled>
 
                             <div class="form-text text-center mt-2">
 
@@ -188,36 +188,63 @@
 
             const outlet = $('#outlet_id');
             const barcode = $('#barcodeInput');
-            const status = $('#scanStatus');
             const history = $('#scanHistory');
             const historyOutlet = $('#historyOutlet');
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | URL
-            |--------------------------------------------------------------------------
-            */
-
             const scanUrl = "{{ route('super.scan-records.scan') }}";
-
             const historyUrl = "{{ route('super.scan-records.history') }}";
 
 
             /*
             |--------------------------------------------------------------------------
-            | FOCUS BARCODE
+            | SCANNER CONFIG
+            |--------------------------------------------------------------------------
+            |
+            | Barcode scanner biasanya mengirim karakter sangat cepat lalu ENTER.
+            | Ketikan keyboard biasa akan dibuang jika jeda antar karakter terlalu lama.
+            |
+            */
+
+            const SCANNER_MAX_INTERVAL = 120; // ms antar karakter
+            const SCANNER_TIMEOUT = 500; // reset buffer jika terlalu lama
+            const MIN_BARCODE_LENGTH = 3;
+
+            let scanBuffer = '';
+            let scanTimer = null;
+            let lastKeyTime = 0;
+            let processingScan = false;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | FOCUS
             |--------------------------------------------------------------------------
             */
 
             function focusBarcode() {
-                if (outlet.val()) {
 
-                    barcode
-                        .prop('disabled', false)
-                        .focus();
-
+                if (!outlet.val() || processingScan) {
+                    return;
                 }
+
+                barcode
+                    .prop('disabled', false)
+                    .prop('readonly', true)
+                    .focus();
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLEAN BARCODE
+            |--------------------------------------------------------------------------
+            */
+
+            function cleanBarcode(value) {
+
+                return String(value || '')
+                    .replace(/[\r\n\t]/g, '')
+                    .trim();
             }
 
 
@@ -228,17 +255,15 @@
             */
 
             function loadHistory() {
-                let outletId = outlet.val();
+
+                const outletId = outlet.val();
 
                 if (!outletId) {
 
                     history.html(`
                 <tr>
-                    <td
-                        colspan="4"
-                        class="text-center text-muted py-4"
-                    >
-                        Pilih outlet untuk melihat history.
+                    <td colspan="6" class="text-center text-muted py-4">
+                        Pilih outlet terlebih dahulu.
                     </td>
                 </tr>
             `);
@@ -248,13 +273,9 @@
                     return;
                 }
 
-
                 $.ajax({
-
                     url: historyUrl,
-
                     type: 'GET',
-
                     data: {
                         outlet_id: outletId
                     },
@@ -263,16 +284,12 @@
 
                         history.empty();
 
-
                         if (!response.data || response.data.length === 0) {
 
                             history.html(`
                         <tr>
-                            <td
-                                colspan="4"
-                                class="text-center text-muted py-4"
-                            >
-                                Belum ada history scan.
+                            <td colspan="6" class="text-center text-muted py-4">
+                                Belum ada scan.
                             </td>
                         </tr>
                     `);
@@ -280,21 +297,19 @@
                             return;
                         }
 
-
                         $.each(response.data, function(index, item) {
 
+                            const methodBadge =
+                                item.scan_method === 'scanner' ?
+                                '<span class="badge bg-primary">Scanner</span>' :
+                                '<span class="badge bg-success">Camera</span>';
+
                             history.append(`
-
                         <tr>
+                            <td>${index + 1}</td>
 
                             <td>
-                                ${index + 1}
-                            </td>
-
-                            <td>
-                                <strong>
-                                    ${item.qrcode ?? '-'}
-                                </strong>
+                                <strong>${item.qrcode ?? '-'}</strong>
                             </td>
 
                             <td>
@@ -306,41 +321,163 @@
                             </td>
 
                             <td>
-                                ${item.scan_method === 'scanner'
-                                    ? '<span class="badge bg-primary">Scanner</span>'
-                                    : '<span class="badge bg-success">Camera</span>'
-                                }
+                                ${methodBadge}
                             </td>
 
                             <td>
                                 ${item.scanned_at ?? '-'}
                             </td>
-
                         </tr>
-
                     `);
 
                         });
-
                     },
 
-                    error: function() {
+                    error: function(xhr) {
 
                         history.html(`
                     <tr>
-                        <td
-                            colspan="4"
-                            class="text-center text-danger py-4"
-                        >
+                        <td colspan="6" class="text-center text-danger py-4">
                             Gagal mengambil history scan.
                         </td>
                     </tr>
                 `);
 
+                        console.error('History error:', xhr.responseJSON);
                     }
-
                 });
+            }
 
+
+            /*
+            |--------------------------------------------------------------------------
+            | PROCESS SCAN
+            |--------------------------------------------------------------------------
+            */
+
+            function processScan(rawValue) {
+
+                let qrcode = cleanBarcode(rawValue);
+                const outletId = outlet.val();
+
+                if (!outletId) {
+
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Outlet Belum Dipilih',
+                        text: 'Silakan pilih outlet terlebih dahulu.',
+                        confirmButtonText: 'OK'
+                    });
+
+                    resetScanner();
+                    return;
+                }
+
+                if (!qrcode || qrcode.length < MIN_BARCODE_LENGTH) {
+                    resetScanner();
+                    return;
+                }
+
+                if (processingScan) {
+                    return;
+                }
+
+                processingScan = true;
+
+                barcode.prop('disabled', true);
+
+                $.ajax({
+
+                    url: scanUrl,
+
+                    type: 'POST',
+
+                    data: {
+                        _token: "{{ csrf_token() }}",
+                        outlet_id: outletId,
+                        qrcode: qrcode,
+                        scan_method: 'scanner'
+                    },
+
+                    success: function(response) {
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Tiket Valid',
+                            text: response.message || 'Tiket berhasil diterima.',
+                            showConfirmButton: false,
+                            timer: 1800,
+                            timerProgressBar: true
+                        });
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | HISTORY LANGSUNG REFRESH
+                        |--------------------------------------------------------------------------
+                        */
+
+                        loadHistory();
+                    },
+
+                    error: function(xhr) {
+
+                        let message = 'Tiket tidak dapat diproses.';
+                        let title = 'Scan Ditolak';
+
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+
+                        if (xhr.status === 404) {
+                            title = 'Tiket Tidak Ditemukan';
+                        }
+
+                        if (xhr.status === 422) {
+                            title = 'Tiket Sudah Digunakan';
+                        }
+
+                        if (xhr.status === 403) {
+                            title = 'Akses Ditolak';
+                        }
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: title,
+                            text: message,
+                            timer: 1800,
+                            timerProgressBar: true,
+                            confirmButtonText: 'OK'
+                        });
+                    },
+
+                    complete: function() {
+
+                        resetScanner();
+                    }
+                });
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | RESET SCANNER
+            |--------------------------------------------------------------------------
+            */
+
+            function resetScanner() {
+
+                clearTimeout(scanTimer);
+
+                scanBuffer = '';
+                lastKeyTime = 0;
+                processingScan = false;
+
+                barcode
+                    .val('')
+                    .prop('disabled', false)
+                    .prop('readonly', true);
+
+                focusBarcode();
             }
 
 
@@ -352,376 +489,206 @@
 
             outlet.on('change', function() {
 
-                let outletId = $(this).val();
+                const outletId = $(this).val();
 
+                scanBuffer = '';
+                lastKeyTime = 0;
+
+                barcode.val('');
 
                 if (!outletId) {
 
-                    barcode
-                        .val('')
-                        .prop('disabled', true);
+                    barcode.prop('disabled', true);
 
-                    status
-                        .removeClass(
-                            'alert-success alert-danger alert-warning'
-                        )
-                        .addClass(
-                            'alert-secondary'
-                        )
-                        .text(
-                            'Silakan pilih outlet terlebih dahulu.'
-                        );
+                    historyOutlet.text('-');
 
                     loadHistory();
 
                     return;
                 }
 
-
-                let outletText = $(this)
+                const outletText = $(this)
                     .find('option:selected')
                     .text()
                     .trim();
 
-
                 historyOutlet.text(outletText);
 
-
                 barcode
-                    .val('')
                     .prop('disabled', false)
+                    .prop('readonly', true)
                     .focus();
 
+                loadHistory();
+            });
 
-                status
-                    .removeClass(
-                        'alert-secondary alert-danger alert-warning'
-                    )
-                    .addClass(
-                        'alert-success'
-                    )
-                    .text(
-                        'Outlet siap. Silakan scan tiket.'
-                    );
+
+            /*
+            |--------------------------------------------------------------------------
+            | BARCODE SCANNER LISTENER
+            |--------------------------------------------------------------------------
+            |
+            | Scanner USB/Bluetooth akan mengirim:
+            |
+            | 1 -> 0 -> 3 -> 5 -> 0 -> 1 -> ENTER
+            |
+            | ENTER tidak ikut dikirim ke server.
+            | \r dan \n juga dibersihkan.
+            |
+            */
+
+            $(document).on('keydown', function(e) {
+
+                if (!outlet.val() || processingScan) {
+                    return;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | IGNORE MODIFIER
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    e.key === 'Shift' ||
+                    e.key === 'Control' ||
+                    e.key === 'Alt' ||
+                    e.key === 'Meta' ||
+                    e.key === 'Tab' ||
+                    e.key === 'Escape'
+                ) {
+                    return;
+                }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | LOAD HISTORY OUTLET
+                | ENTER = SCANNER SELESAI
                 |--------------------------------------------------------------------------
                 */
 
-                loadHistory();
+                if (e.key === 'Enter') {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    clearTimeout(scanTimer);
+
+                    const qrcode = cleanBarcode(scanBuffer);
+
+                    scanBuffer = '';
+                    lastKeyTime = 0;
+
+                    barcode.val('');
+
+                    if (qrcode.length >= MIN_BARCODE_LENGTH) {
+                        processScan(qrcode);
+                    }
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | HANYA TERIMA KARAKTER
+                |--------------------------------------------------------------------------
+                */
+
+                if (e.key.length !== 1) {
+                    return;
+                }
+
+                const now = Date.now();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | DETEKSI KECEPATAN SCANNER
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    lastKeyTime > 0 &&
+                    (now - lastKeyTime) > SCANNER_MAX_INTERVAL
+                ) {
+
+                    /*
+                    | Jeda terlalu lama = kemungkinan ketikan manual.
+                    | Buang buffer.
+                    */
+
+                    scanBuffer = '';
+                }
+
+                lastKeyTime = now;
+
+                scanBuffer += e.key;
+
+                /*
+                |--------------------------------------------------------------------------
+                | TAMPILKAN HASIL SCAN
+                |--------------------------------------------------------------------------
+                */
+
+                barcode.val(scanBuffer);
+
+                /*
+                |--------------------------------------------------------------------------
+                | AUTO RESET
+                |--------------------------------------------------------------------------
+                */
+
+                clearTimeout(scanTimer);
+
+                scanTimer = setTimeout(function() {
+
+                    scanBuffer = '';
+                    lastKeyTime = 0;
+
+                    barcode.val('');
+
+                }, SCANNER_TIMEOUT);
 
             });
 
 
             /*
             |--------------------------------------------------------------------------
-            | BARCODE SCAN
+            | BLOK KEYBOARD MANUAL PADA INPUT
             |--------------------------------------------------------------------------
             */
 
-            barcode.on('keydown', function(e) {
+            barcode.on('keydown keypress keyup', function(e) {
 
-                if (e.key !== 'Enter') {
-                    return;
+                /*
+                | Scanner ditangkap oleh document listener di atas.
+                | Input readonly sehingga keyboard manual tidak dapat memasukkan teks.
+                */
+
+                if (e.key !== 'Tab') {
+                    e.preventDefault();
                 }
-
-                e.preventDefault();
-
-
-                let qrcode = $.trim(
-                    barcode.val()
-                );
-
-                let outletId = outlet.val();
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | VALIDASI OUTLET
-                |--------------------------------------------------------------------------
-                */
-
-                if (!outletId) {
-
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Outlet Belum Dipilih',
-                        text: 'Silakan pilih outlet terlebih dahulu.',
-                        confirmButtonText: 'OK'
-                    });
-
-                    barcode
-                        .val('')
-                        .focus();
-
-                    return;
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | VALIDASI QR
-                |--------------------------------------------------------------------------
-                */
-
-                if (!qrcode) {
-                    return;
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | LOCK
-                |--------------------------------------------------------------------------
-                */
-
-                barcode.prop(
-                    'disabled',
-                    true
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | AJAX SCAN
-                |--------------------------------------------------------------------------
-                */
-
-                $.ajax({
-
-                    url: scanUrl,
-
-                    type: 'POST',
-
-                    data: {
-
-                        _token: "{{ csrf_token() }}",
-
-                        outlet_id: outletId,
-
-                        qrcode: qrcode,
-                        scan_method: 'scanner'
-
-                    },
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SUCCESS
-                    |--------------------------------------------------------------------------
-                    */
-
-                    success: function(response) {
-
-
-                        Swal.fire({
-
-                            icon: 'success',
-
-                            title: 'Tiket Valid',
-
-                            text: response.message ||
-                                'Tiket berhasil diterima.',
-
-                            showConfirmButton: false,
-
-                            timer: 1800,
-
-                            timerProgressBar: true
-
-                        });
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | STATUS
-                        |--------------------------------------------------------------------------
-                        */
-
-                        status
-                            .removeClass(
-                                'alert-warning alert-danger alert-secondary'
-                            )
-                            .addClass(
-                                'alert-success'
-                            )
-                            .text(
-                                '✓ Tiket berhasil diterima.'
-                            );
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | CLEAR
-                        |--------------------------------------------------------------------------
-                        */
-
-                        barcode
-                            .val('')
-                            .prop('disabled', false)
-                            .focus();
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | REFRESH HISTORY
-                        |--------------------------------------------------------------------------
-                        */
-
-                        loadHistory();
-
-                    },
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | ERROR
-                    |--------------------------------------------------------------------------
-                    */
-
-                    error: function(xhr) {
-
-                        let message =
-                            'Tiket tidak dapat diproses.';
-
-                        let title =
-                            'Scan Ditolak';
-
-                        let icon =
-                            'error';
-
-
-                        if (
-                            xhr.responseJSON &&
-                            xhr.responseJSON.message
-                        ) {
-
-                            message =
-                                xhr.responseJSON.message;
-
-                        }
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | TIKET TIDAK DITEMUKAN
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (xhr.status === 404) {
-
-                            title =
-                                'Tiket Tidak Ditemukan';
-
-                        }
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | SUDAH SCAN
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (xhr.status === 422) {
-
-                            title =
-                                'Tiket Sudah Digunakan';
-
-                        }
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | AKSES OUTLET
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (xhr.status === 403) {
-
-                            title =
-                                'Akses Ditolak';
-
-                        }
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | SWEET ALERT
-                        |--------------------------------------------------------------------------
-                        */
-
-                        Swal.fire({
-
-                            icon: icon,
-
-                            title: title,
-
-                            text: message,
-
-
-                            timer: 1800,
-                            timerProgressBar: true,
-
-                            confirmButtonText: 'OK'
-
-                        });
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | STATUS
-                        |--------------------------------------------------------------------------
-                        */
-
-                        status
-                            .removeClass(
-                                'alert-warning alert-success alert-secondary'
-                            )
-                            .addClass(
-                                'alert-danger'
-                            )
-                            .text(
-                                '✕ ' + message
-                            );
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | READY SCAN LAGI
-                        |--------------------------------------------------------------------------
-                        */
-
-                        barcode
-                            .val('')
-                            .prop('disabled', false)
-                            .focus();
-
-                    }
-
-                });
 
             });
 
 
             /*
             |--------------------------------------------------------------------------
-            | CLICK PAGE → FOCUS SCANNER
+            | CLICK PAGE = FOCUS SCANNER
             |--------------------------------------------------------------------------
             */
 
             $(document).on('click', function(e) {
 
                 if (
-                    $(e.target).closest('#outlet_id').length
+                    $(e.target).closest('#outlet_id').length ||
+                    $(e.target).closest('.swal2-container').length
                 ) {
                     return;
                 }
 
                 focusBarcode();
-
             });
 
 
@@ -731,267 +698,15 @@
             |--------------------------------------------------------------------------
             */
 
-            barcode.prop(
-                'disabled',
-                !outlet.val()
-            );
-
+            barcode
+                .prop('disabled', !outlet.val())
+                .prop('readonly', true);
 
             if (outlet.val()) {
 
                 loadHistory();
-
                 focusBarcode();
-
             }
-
-        });
-
-
-        function loadHistory() {
-            let outletId = $('#outlet_id').val();
-
-            if (!outletId) {
-
-                $('#scanHistory').html(`
-            <tr>
-                <td
-                    colspan="6"
-                    class="text-center text-muted py-4">
-
-                    Pilih outlet terlebih dahulu.
-
-                </td>
-            </tr>
-        `);
-
-                $('#historyOutlet').text('-');
-
-                return;
-            }
-
-
-            $.ajax({
-
-                url: "{{ route('super.scan-records.history') }}",
-
-                type: "GET",
-
-                data: {
-                    outlet_id: outletId
-                },
-
-                success: function(response) {
-
-                    let tbody = $('#scanHistory');
-
-                    tbody.empty();
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | TIDAK ADA DATA
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (
-                        !response.data ||
-                        response.data.length === 0
-                    ) {
-
-                        tbody.html(`
-                    <tr>
-                        <td
-                            colspan="6"
-                            class="text-center text-muted py-4">
-
-                            Belum ada scan.
-
-                        </td>
-                    </tr>
-                `);
-
-                        return;
-                    }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | DATA HISTORY
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $.each(response.data, function(index, item) {
-
-                        let methodBadge = '';
-
-                        if (item.scan_method === 'scanner') {
-
-                            methodBadge = `
-                        <span class="badge bg-primary">
-                            Scanner
-                        </span>
-                    `;
-
-                        } else {
-
-                            methodBadge = `
-                        <span class="badge bg-success">
-                            Camera
-                        </span>
-                    `;
-
-                        }
-
-
-                        tbody.append(`
-
-                    <tr>
-
-                        <td>
-                            ${index + 1}
-                        </td>
-
-                        <td>
-                            <strong>
-                                ${item.qrcode ?? '-'}
-                            </strong>
-                        </td>
-
-                        <td>
-                            ${item.no_tiket ?? '-'}
-                        </td>
-
-                        <td>
-                            ${item.ticket_type ?? '-'}
-                        </td>
-
-                        <td>
-                            ${methodBadge}
-                        </td>
-
-                        <td>
-                            ${item.scanned_at ?? '-'}
-                        </td>
-
-                    </tr>
-
-                `);
-
-                    });
-
-                },
-
-                error: function(xhr) {
-
-                    $('#scanHistory').html(`
-                <tr>
-                    <td
-                        colspan="6"
-                        class="text-center text-danger py-4">
-
-                        Gagal mengambil history scan.
-
-                    </td>
-                </tr>
-            `);
-
-                    console.error(
-                        xhr.responseJSON
-                    );
-
-                }
-
-            });
-        }
-
-
-
-
-
-
-        let scanBuffer = '';
-        let scanTimer = null;
-        let lastKeyTime = 0;
-
-        $(document).on('keydown', function(e) {
-
-            const now = Date.now();
-
-            // Abaikan tombol kontrol
-            if (
-                e.key === 'Shift' ||
-                e.key === 'Control' ||
-                e.key === 'Alt' ||
-                e.key === 'Meta'
-            ) {
-                return;
-            }
-
-            // ENTER = scanner selesai mengirim barcode
-            if (e.key === 'Enter') {
-
-                e.preventDefault();
-
-                if (!scanBuffer) {
-                    return;
-                }
-
-                let qrcode = scanBuffer;
-
-                scanBuffer = '';
-
-                clearTimeout(scanTimer);
-
-                $('#barcodeInput').val('');
-
-                // proses scan
-                processScan(qrcode);
-
-                return;
-            }
-
-            // hanya karakter
-            if (e.key.length !== 1) {
-                return;
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | DETEKSI KECEPATAN SCANNER
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                lastKeyTime > 0 &&
-                (now - lastKeyTime) > 100
-            ) {
-
-                // terlalu lambat → dianggap ketikan manual
-                scanBuffer = '';
-
-            }
-
-            lastKeyTime = now;
-
-            scanBuffer += e.key;
-
-            $('#barcodeInput').val(scanBuffer);
-
-            /*
-            |--------------------------------------------------------------------------
-            | RESET
-            |--------------------------------------------------------------------------
-            */
-
-            clearTimeout(scanTimer);
-
-            scanTimer = setTimeout(function() {
-
-                scanBuffer = '';
-                $('#barcodeInput').val('');
-
-            }, 300);
 
         });
     </script>
