@@ -1,4 +1,4 @@
-name: Deploy Laravel
+name: Update Laravel
 
 on:
   push:
@@ -6,33 +6,23 @@ on:
       - main
 
 jobs:
-  deploy:
+  update:
     runs-on: self-hosted
 
     steps:
-      - name: Deploy application
+      - name: Test Runner
+        run: |
+          echo "=== RUNNER TEST ==="
+          whoami
+          hostname
+          pwd
+
+      - name: Update source
         run: |
           cd /var/www/laravel
-
-          echo "=== Update source ==="
-          git fetch origin
+          echo "=== UPDATE SOURCE ==="
+          git fetch origin main
           git reset --hard origin/main
-
-          echo "=== Install dependencies ==="
-          composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
-
-          echo "=== Run migrations ==="
-          php artisan migrate --force
-
-          echo "=== Clear Laravel cache ==="
-          php artisan optimize:clear
-
-          echo "=== Rebuild Laravel cache ==="
-          php artisan config:cache
-          php artisan route:cache
-          php artisan view:cache
-
-          echo "=== Fix permissions ==="
-          chown -R www-data:www-data storage bootstrap/cache
-
-          echo "=== DEPLOY SUCCESS ==="
+          echo "=== CURRENT COMMIT ==="
+          git log -1 --oneline
+          echo "=== UPDATE SUCCESS ==="
