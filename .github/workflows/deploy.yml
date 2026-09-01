@@ -1,0 +1,38 @@
+name: Deploy Laravel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Deploy application
+        run: |
+          cd /var/www/laravel
+
+          echo "=== Update source ==="
+          git fetch origin
+          git reset --hard origin/main
+
+          echo "=== Install dependencies ==="
+          composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+
+          echo "=== Run migrations ==="
+          php artisan migrate --force
+
+          echo "=== Clear Laravel cache ==="
+          php artisan optimize:clear
+
+          echo "=== Rebuild Laravel cache ==="
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+          echo "=== Fix permissions ==="
+          chown -R www-data:www-data storage bootstrap/cache
+
+          echo "=== DEPLOY SUCCESS ==="
