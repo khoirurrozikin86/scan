@@ -1,4 +1,5 @@
-name: Update Laravel
+
+name: Deploy Laravel
 
 on:
   push:
@@ -6,7 +7,7 @@ on:
       - main
 
 jobs:
-  update:
+  deploy:
     runs-on: self-hosted
 
     steps:
@@ -20,9 +21,57 @@ jobs:
       - name: Update source
         run: |
           cd /var/www/laravel
+
           echo "=== UPDATE SOURCE ==="
           git fetch origin main
           git reset --hard origin/main
+
           echo "=== CURRENT COMMIT ==="
           git log -1 --oneline
-          echo "=== UPDATE SUCCESS ==="
+
+      - name: Install dependencies
+        run: |
+          cd /var/www/laravel
+
+          echo "=== COMPOSER INSTALL ==="
+          composer install \
+            --no-dev \
+            --optimize-autoloader \
+            --no-interaction
+
+      - name: Laravel migration
+        run: |
+          cd /var/www/laravel
+
+          echo "=== DATABASE MIGRATION ==="
+          php artisan migrate --force
+
+      - name: Clear cache
+        run: |
+          cd /var/www/laravel
+
+          echo "=== CLEAR CACHE ==="
+          php artisan optimize:clear
+
+      - name: Build Laravel
+        run: |
+          cd /var/www/laravel
+
+          echo "=== BUILD FRONTEND ==="
+          npm ci
+          npm run build
+
+      - name: Laravel cache
+        run: |
+          cd /var/www/laravel
+
+          echo "=== BUILD LARAVEL CACHE ==="
+          php artisan config:cache
+          php artisan view:cache
+          php artisan event:cache
+
+      - name: Deployment success
+        run: |
+          echo "================================"
+          echo "DEPLOYMENT SUCCESS"
+          echo "================================"
