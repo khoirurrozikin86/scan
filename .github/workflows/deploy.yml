@@ -1,4 +1,3 @@
-
 name: Deploy Laravel
 
 on:
@@ -39,27 +38,12 @@ jobs:
             --optimize-autoloader \
             --no-interaction
 
-      - name: Laravel migration
-        run: |
-          cd /var/www/laravel
-
-          echo "=== DATABASE MIGRATION ==="
-          php artisan migrate --force
-
       - name: Clear cache
         run: |
           cd /var/www/laravel
 
           echo "=== CLEAR CACHE ==="
           php artisan optimize:clear
-
-      - name: Build Laravel
-        run: |
-          cd /var/www/laravel
-
-          echo "=== BUILD FRONTEND ==="
-          npm ci
-          npm run build
 
       - name: Laravel cache
         run: |
