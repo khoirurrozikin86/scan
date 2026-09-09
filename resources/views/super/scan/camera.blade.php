@@ -200,7 +200,9 @@
 
 
 
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+{{-- <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script> --}}
+
+<script src="{{ asset('assets/js/html5-qrcode/html5-qrcode.min.js') }}"></script>
 
 @push('scripts')
     <script>
