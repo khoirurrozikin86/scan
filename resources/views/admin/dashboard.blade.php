@@ -335,31 +335,30 @@
 
             {{-- HEADER --}}
 
-            <div class="d-flex justify-content-between align-items-start mb-3">
+            <div class="d-flex justify-content-between align-items-end mb-4">
 
                 <div>
-
                     <h5 class="fw-bold mb-1">
                         Total Scan by Outlet
                     </h5>
 
                     <div class="text-muted small">
+                        Statistik scan berdasarkan outlet
+                    </div>
+                </div>
 
-                        Today's Scan:
+                <form method="GET" action="{{ route('super.dashboard') }}" class="d-flex align-items-end gap-2">
 
-                        <span class="badge today-count">
-                            {{ number_format($totalToday) }}
-                        </span>
+                    <div>
+                        <label for="scan_date" class="form-label small fw-semibold mb-1">
+                            Tanggal
+                        </label>
 
+                        <input type="date" id="scan_date" name="scan_date" value="{{ $scanDate }}"
+                            class="form-control form-control-sm" onchange="this.form.submit()">
                     </div>
 
-                </div>
-
-                <div class="small text-muted">
-
-                    {{ now()->format('d-m-Y') }}
-
-                </div>
+                </form>
 
             </div>
 
@@ -425,7 +424,7 @@
 
                             <th>User</th>
 
-                            <th>Barcode</th>
+                            <th>No Tiket</th>
 
                             <th>Ticket Type</th>
 
@@ -457,13 +456,17 @@
 
                                 {{-- OUTLET TYPE --}}
                                 <td>
+                                    @php
+                                        $outletType = $scan->outlet?->outlet_type;
+                                    @endphp
 
-                                    <span class="badge badge-outlet-type">
-
-                                        {{ $scan->outlet?->outlet_type ?? '-' }}
-
-                                    </span>
-
+                                    @if ($outletType)
+                                        <span class="badge rounded-pill px-3 py-2 outlet-type-badge">
+                                            {{ $outletType }}
+                                        </span>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
                                 </td>
 
 
@@ -476,12 +479,11 @@
 
 
                                 {{-- BARCODE --}}
+                                {{-- NO TIKET --}}
                                 <td>
 
                                     <span class="fw-semibold">
-
-                                        {{ $scan->qrcode ?? '-' }}
-
+                                        {{ $scan->ticketQrcode?->no_tiket ?? '-' }}
                                     </span>
 
                                 </td>
@@ -568,8 +570,8 @@
     <style>
         /* Hero gradient + animation */
         /* =========================================================
-                                                                                   DASHBOARD HERO
-                                                                                   ========================================================= */
+                                                                                                                       DASHBOARD HERO
+                                                                                                                       ========================================================= */
 
         .dashboard-hero {
             position: relative;
@@ -614,9 +616,21 @@
         }
 
 
+        .outlet-type-badge {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            font-size: 11px;
+            font-weight: 700;
+            color: #15803d !important;
+            background: #dcfce7 !important;
+            border: 1px solid #bbf7d0;
+        }
+
+
         /* =========================================================
-                                                                                   HERO CONTENT
-                                                                                   ========================================================= */
+                                                                                                                       HERO CONTENT
+                                                                                                                       ========================================================= */
 
         .hero-content {
             position: relative;
@@ -665,8 +679,8 @@
 
 
         /* =========================================================
-                                                                                   HERO STAT
-                                                                                   ========================================================= */
+                                                                                                                       HERO STAT
+                                                                                                                       ========================================================= */
 
         .hero-stat {
             display: flex;
@@ -725,8 +739,8 @@
 
 
         /* =========================================================
-                                                                                   OSIL
-                                                                                   ========================================================= */
+                                                                                                                       OSIL
+                                                                                                                       ========================================================= */
 
         .osil-wrapper {
             position: relative;
@@ -772,8 +786,8 @@
 
 
         /* =========================================================
-                                                                                   OSIL MESSAGE
-                                                                                   ========================================================= */
+                                                                                                                       OSIL MESSAGE
+                                                                                                                       ========================================================= */
 
         .osil-message {
             position: absolute;
@@ -830,8 +844,8 @@
 
 
         /* =========================================================
-                                                                                   QUICK ACCESS CARD
-                                                                                   ========================================================= */
+                                                                                                                       QUICK ACCESS CARD
+                                                                                                                       ========================================================= */
 
         .quick-card {
             position: relative;
@@ -936,8 +950,8 @@
 
 
         /* =========================================================
-                                                                                   QUICK CONTENT
-                                                                                   ========================================================= */
+                                                                                                                       QUICK CONTENT
+                                                                                                                       ========================================================= */
 
         .quick-content {
             position: relative;
@@ -966,8 +980,8 @@
 
 
         /* =========================================================
-                                                                                   ARROW
-                                                                                   ========================================================= */
+                                                                                                                       ARROW
+                                                                                                                       ========================================================= */
 
         .quick-arrow {
             position: relative;
@@ -995,8 +1009,8 @@
 
 
         /* =========================================================
-                                                                                   RESPONSIVE
-                                                                                   ========================================================= */
+                                                                                                                       RESPONSIVE
+                                                                                                                       ========================================================= */
 
         @media (max-width: 991px) {
 
