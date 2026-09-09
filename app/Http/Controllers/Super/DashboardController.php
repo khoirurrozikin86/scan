@@ -3,25 +3,33 @@
 namespace App\Http\Controllers\Super;
 
 use App\Http\Controllers\Controller;
-
 use App\Models\ScanRecord;
-
 use App\Models\Outlet;
-
 use App\Models\User;
-
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         /*
-    |--------------------------------------------------------------------------
-    | RECENT SCANS
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | SCAN DATE
+        |--------------------------------------------------------------------------
+        */
+
+        $scanDate = $request->input(
+            'scan_date',
+            now()->toDateString()
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RECENT SCANS
+        |--------------------------------------------------------------------------
+        */
 
         $recentScans = ScanRecord::with([
             'user',
@@ -33,21 +41,17 @@ class DashboardController extends Controller
 
 
         /*
-    |--------------------------------------------------------------------------
-    | TOTAL SCAN BY OUTLET
-    |--------------------------------------------------------------------------
-    | Hari ini
-    */
+        |--------------------------------------------------------------------------
+        | TOTAL SCAN BY OUTLET
+        |--------------------------------------------------------------------------
+        */
 
         $scanByOutlet = ScanRecord::query()
             ->select(
                 'outlet_id',
                 DB::raw('COUNT(*) as total')
             )
-            ->whereDate(
-                'scanned_at',
-                today()
-            )
+            ->whereDate('scanned_at', $scanDate)
             ->with('outlet')
             ->groupBy('outlet_id')
             ->get()
@@ -56,10 +60,10 @@ class DashboardController extends Controller
 
 
         /*
-    |--------------------------------------------------------------------------
-    | DATA CHART
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | DATA CHART
+        |--------------------------------------------------------------------------
+        */
 
         $outletLabels = $scanByOutlet
             ->map(function ($item) {
@@ -70,14 +74,13 @@ class DashboardController extends Controller
             })
             ->values();
 
-
         $outletTotals = $scanByOutlet
             ->pluck('total')
             ->values();
 
-
-        $totalToday = $outletTotals->sum();
-
+        $totalToday = ScanRecord::query()
+            ->whereDate('scanned_at', today())
+            ->count();
 
         $totalOutlets = Outlet::count();
 
@@ -91,7 +94,7 @@ class DashboardController extends Controller
             'totalToday',
             'totalOutlets',
             'totalUsers',
-
+            'scanDate',
         ));
     }
 }
