@@ -250,13 +250,87 @@ class ScanController extends Controller
     /**
      * Scan Records
      */
-    public function index()
+    public function index(Request $request)
     {
+        $user = $request->user();
+
+        $isSuperAdmin = $user->hasRole('super-admin');
+
+        /*
+    |--------------------------------------------------------------------------
+    | OUTLET YANG BOLEH DIAKSES USER
+    |--------------------------------------------------------------------------
+    */
+
+        if ($isSuperAdmin) {
+
+            $outlets = Outlet::query()
+                ->where('is_active', true)
+                ->orderBy('outlet_name')
+                ->get([
+                    'id',
+                    'outlet_code',
+                    'outlet_name',
+                    'outlet_type',
+                ]);
+        } else {
+
+            $outlets = $user->outlets()
+                ->where('outlets.is_active', true)
+                ->orderBy('outlet_name')
+                ->get([
+                    'outlets.id',
+                    'outlets.outlet_code',
+                    'outlets.outlet_name',
+                    'outlets.outlet_type',
+                ]);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | USERNAME / OPERATOR
+    |--------------------------------------------------------------------------
+    */
+
+        $users = User::query()
+            ->whereHas('scanRecords', function ($query) use ($isSuperAdmin, $user) {
+
+                if (!$isSuperAdmin) {
+
+                    $query->whereIn(
+                        'outlet_id',
+                        $user->outlets()->pluck('outlets.id')
+                    );
+                }
+            })
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+            ]);
+
+        /*
+    |--------------------------------------------------------------------------
+    | OUTLET TYPE
+    |--------------------------------------------------------------------------
+    */
+
+        $outletTypes = $outlets
+            ->pluck('outlet_type')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
         return view(
-            'super.scan.records'
+            'super.scan.records',
+            compact(
+                'users',
+                'outlets',
+                'outletTypes'
+            )
         );
     }
-
 
     /**
      * DataTable Scan Records
@@ -264,16 +338,42 @@ class ScanController extends Controller
 
     public function dt(Request $request)
     {
+        $user = $request->user();
+
+        $isSuperAdmin = $user->hasRole('super-admin');
+
+        /*
+    |--------------------------------------------------------------------------
+    | QUERY DASAR
+    |--------------------------------------------------------------------------
+    */
+
         $query = ScanRecord::query()
             ->with([
                 'user',
                 'outlet',
             ]);
 
+        /*
+    |--------------------------------------------------------------------------
+    | BATASI OUTLET USER
+    |--------------------------------------------------------------------------
+    */
+
+        if (!$isSuperAdmin) {
+
+            $allowedOutletIds = $user->outlets()
+                ->pluck('outlets.id');
+
+            $query->whereIn(
+                'outlet_id',
+                $allowedOutletIds
+            );
+        }
 
         /*
     |--------------------------------------------------------------------------
-    | FILTER DARI TANGGAL
+    | FILTER PERIODE
     |--------------------------------------------------------------------------
     */
 
@@ -286,13 +386,6 @@ class ScanController extends Controller
             );
         }
 
-
-        /*
-    |--------------------------------------------------------------------------
-    | FILTER SAMPAI TANGGAL
-    |--------------------------------------------------------------------------
-    */
-
         if ($request->filled('date_to')) {
 
             $query->whereDate(
@@ -302,6 +395,56 @@ class ScanController extends Controller
             );
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | FILTER USERNAME / OPERATOR
+    |--------------------------------------------------------------------------
+    */
+
+        if ($request->filled('user_id')) {
+
+            $query->where(
+                'user_id',
+                $request->user_id
+            );
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | FILTER OUTLET
+    |--------------------------------------------------------------------------
+    */
+
+        if ($request->filled('outlet_id')) {
+
+            $query->where(
+                'outlet_id',
+                $request->outlet_id
+            );
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | FILTER OUTLET TYPE
+    |--------------------------------------------------------------------------
+    */
+
+        if ($request->filled('outlet_type')) {
+
+            $query->whereHas('outlet', function ($q) use ($request) {
+
+                $q->where(
+                    'outlet_type',
+                    $request->outlet_type
+                );
+            });
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | DATATABLE
+    |--------------------------------------------------------------------------
+    */
 
         return DataTables::of($query)
 
@@ -323,8 +466,6 @@ class ScanController extends Controller
                 $scan->outlet?->outlet_type ?? '-'
             )
 
-
-
             ->editColumn(
                 'scan_method',
                 fn($scan) =>
@@ -335,32 +476,42 @@ class ScanController extends Controller
                 'scanned_at',
                 fn($scan) =>
                 $scan->scanned_at
-                    ? $scan->scanned_at->format(
-                        'd-m-Y H:i:s'
-                    )
+                    ? $scan->scanned_at->format('d-m-Y H:i:s')
                     : '-'
             )
 
-
             ->addColumn('action', function ($scan) {
+                $url = route('super.scan-records.destroy', [
+                    'scanRecord' => $scan->id
+                ]);
 
                 return '
         <span
             class="badge bg-danger btn-delete-scan"
-            data-url="' . route(
-                    'super.scan-records.destroy',
-                    ['scanRecord' => $scan->id]
-                ) . '"
+            data-url="' . e($url) . '"
             title="Hapus"
-            style="cursor:pointer;">
-
-            <i class="fas fa-trash">X</i>
-
+            style="cursor:pointer; display:inline-flex; align-items:center; justify-content:center;"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                <path d="M10 11v6"></path>
+                <path d="M14 11v6"></path>
+                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+            </svg>
         </span>
     ';
             })
-
-
 
             ->rawColumns([
                 'action'
@@ -476,36 +627,107 @@ class ScanController extends Controller
 
     public function export(Request $request)
     {
-        $dateFrom = $request->input('date_from');
-        $dateTo   = $request->input('date_to');
+        $request->validate([
+            'date_from'   => ['required', 'date'],
+            'date_to'     => ['required', 'date', 'after_or_equal:date_from'],
+            'user_id'     => ['nullable', 'integer'],
+            'outlet_id'   => ['nullable', 'integer'],
+            'outlet_type' => ['nullable', 'string', 'max:100'],
+        ]);
 
-        if (!$dateFrom || !$dateTo) {
+        $user = $request->user();
 
-            return back()->with(
-                'error',
-                'Tanggal filter belum dipilih.'
-            );
+        $dateFrom   = $request->input('date_from');
+        $dateTo     = $request->input('date_to');
+        $userId     = $request->filled('user_id')
+            ? (int) $request->input('user_id')
+            : null;
+        $outletId   = $request->filled('outlet_id')
+            ? (int) $request->input('outlet_id')
+            : null;
+        $outletType = $request->filled('outlet_type')
+            ? $request->input('outlet_type')
+            : null;
+
+        $isSuperAdmin = $user->hasRole('super-admin');
+
+        /*
+        |--------------------------------------------------------------------------
+        | OUTLET ACCESS
+        |--------------------------------------------------------------------------
+        */
+
+        $allowedOutletIds = [];
+
+        if (!$isSuperAdmin) {
+            $allowedOutletIds = $user->outlets()
+                ->where('outlets.is_active', true)
+                ->pluck('outlets.id')
+                ->map(fn($id) => (int) $id)
+                ->all();
+
+            /*
+            | User memilih outlet di luar hak akses
+            */
+
+            if ($outletId !== null && !in_array($outletId, $allowedOutletIds, true)) {
+                abort(403, 'Anda tidak memiliki akses ke outlet ini.');
+            }
         }
 
-        if ($dateFrom > $dateTo) {
+        /*
+        |--------------------------------------------------------------------------
+        | USER ACCESS
+        |--------------------------------------------------------------------------
+        */
 
-            return back()->with(
-                'error',
-                'Range tanggal tidak valid.'
-            );
+        if ($userId !== null) {
+            $userExists = User::query()
+                ->whereKey($userId)
+                ->whereHas('scanRecords', function ($query) use ($isSuperAdmin, $allowedOutletIds) {
+                    if (!$isSuperAdmin) {
+                        $query->whereIn('outlet_id', $allowedOutletIds);
+                    }
+                })
+                ->exists();
+
+            if (!$userExists) {
+                abort(403, 'User tidak memiliki data scan yang dapat diakses.');
+            }
         }
 
-        $filename =
-            'scan-records_' .
-            $dateFrom .
-            '_sd_' .
-            $dateTo .
-            '.xlsx';
+        /*
+        |--------------------------------------------------------------------------
+        | FILENAME
+        |--------------------------------------------------------------------------
+        */
+
+        $filename = 'scan-records_' . $dateFrom . '_sd_' . $dateTo;
+
+        if ($userId !== null) {
+            $filename .= '_user-' . $userId;
+        }
+
+        if ($outletId !== null) {
+            $filename .= '_outlet-' . $outletId;
+        }
+
+        $filename .= '.xlsx';
+
+        /*
+        |--------------------------------------------------------------------------
+        | EXPORT
+        |--------------------------------------------------------------------------
+        */
 
         return Excel::download(
             new ScanRecordsExport(
                 $dateFrom,
-                $dateTo
+                $dateTo,
+                $userId,
+                $outletId,
+                $outletType,
+                $allowedOutletIds
             ),
             $filename
         );
