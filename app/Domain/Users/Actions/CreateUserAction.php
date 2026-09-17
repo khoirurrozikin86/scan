@@ -11,12 +11,14 @@ class CreateUserAction
     public function __invoke(UserData $data): User
     {
         $user = new User();
-        $user->name  = $data->name;
+        $user->name = $data->name;
         $user->email = $data->email;
-        $user->password = Hash::make($data->password && trim($data->password) !== ''
-            ? $data->password
-            : str()->random(12)
+        $user->password = Hash::make(
+            $data->password && trim($data->password) !== ''
+                ? $data->password
+                : str()->random(12)
         );
+
         // Jangan set $user->active jika kolomnya tidak ada
         $user->save();
 

@@ -292,6 +292,34 @@
 
 
 
+
+
+            {{-- ================= SYSTEM ================= --}}
+            @can('audit-logs.view')
+                <li class="nav-item nav-category">
+                    SYSTEM
+                </li>
+
+                {{-- Audit Log --}}
+                <li class="nav-item">
+
+                    <a href="{{ route('super.audit-logs.index') }}"
+                        class="nav-link {{ request()->routeIs('super.audit-logs.*') ? 'active' : '' }}">
+
+                        <i class="link-icon" data-feather="activity"></i>
+
+                        <span class="link-title">
+                            Audit Log
+                        </span>
+
+                    </a>
+
+                </li>
+            @endcan
+
+
+
+
         </ul>
 
     </div>

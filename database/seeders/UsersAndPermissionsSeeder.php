@@ -30,6 +30,7 @@ class UsersAndPermissionsSeeder extends Seeder
             'ticket-qrcode' => ['view', 'create', 'update', 'delete'],
             'user-outlets' => ['view', 'create', 'update', 'delete'],
             'scan-records' => ['view', 'create', 'update', 'delete'],
+            'audit-log' => ['view', 'create', 'update', 'delete'],
 
 
 
@@ -59,7 +60,8 @@ class UsersAndPermissionsSeeder extends Seeder
             'scan-records.view',
             'scan-records.create',
             'scan-records.update',
-            'scan-records.delete'
+            'scan-records.delete',
+            'audit-log.view',
         ]);
 
         // 👨‍💼 ADMIN: CRUD penuh semua modul utama
@@ -98,7 +100,10 @@ class UsersAndPermissionsSeeder extends Seeder
             'scan-records.view',
             'scan-records.create',
             'scan-records.update',
-            'scan-records.delete'
+            'scan-records.delete',
+
+
+            'audit-log.view',
 
 
         ]);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\ScanRecords\Queries\ScanRecordTableQuery;
 use App\Models\Outlet;
 use App\Models\User;
@@ -20,6 +21,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ScanController extends Controller
 {
+    public function __construct(
+        protected AuditLogService $auditLog,
+    ) {}
+
     /**
      * Camera Scan
      */
@@ -82,50 +87,71 @@ class ScanController extends Controller
                 'required',
                 'integer',
             ],
-
             'qrcode' => [
                 'required',
                 'string',
                 'max:255',
             ],
-
             'scan_method' => [
                 'required',
                 'in:camera,scanner',
             ],
         ]);
 
-        $user = auth()->user();
-
+        $user = $request->user();
         $scanMethod = $request->input('scan_method');
+        $qrcode = trim($request->input('qrcode'));
 
         /*
-    |--------------------------------------------------------------------------
-    | CEK OUTLET
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | CEK OUTLET
+        |--------------------------------------------------------------------------
+        */
         $outlet = $user->outlets()
             ->where('outlets.id', $request->outlet_id)
             ->where('outlets.is_active', true)
             ->first();
 
         if (!$outlet) {
+            $this->auditLog->log(
+                action: 'SCAN_FAILED',
+                module: 'SCAN_RECORD',
+                description: "Scan gagal: user #{$user->id} tidak memiliki akses ke outlet #{$request->outlet_id}",
+                newValues: [
+                    'outlet_id' => (int) $request->outlet_id,
+                    'qrcode' => $qrcode,
+                    'scan_method' => $scanMethod,
+                    'reason' => 'OUTLET_ACCESS_DENIED',
+                ],
+            );
+
             return response()->json([
                 'message' => 'Anda tidak memiliki akses ke outlet ini.',
             ], 403);
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | CEK FITUR SCANNER
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | CEK FITUR SCANNER
+        |--------------------------------------------------------------------------
+        */
         if (
             $scanMethod === 'scanner'
             && !$outlet->is_scanner_enabled
         ) {
+            $this->auditLog->log(
+                action: 'SCAN_FAILED',
+                module: 'SCAN_RECORD',
+                description: "Scan gagal: barcode scanner tidak aktif di outlet {$outlet->outlet_name}",
+                model: $outlet,
+                newValues: [
+                    'outlet_id' => $outlet->id,
+                    'qrcode' => $qrcode,
+                    'scan_method' => $scanMethod,
+                    'reason' => 'SCANNER_DISABLED',
+                ],
+            );
+
             return response()->json([
                 'message' => 'Barcode scanner tidak diaktifkan pada outlet ini.',
             ], 403);
@@ -135,117 +161,146 @@ class ScanController extends Controller
             $scanMethod === 'camera'
             && !$outlet->is_camera_enabled
         ) {
+            $this->auditLog->log(
+                action: 'SCAN_FAILED',
+                module: 'SCAN_RECORD',
+                description: "Scan gagal: camera scanner tidak aktif di outlet {$outlet->outlet_name}",
+                model: $outlet,
+                newValues: [
+                    'outlet_id' => $outlet->id,
+                    'qrcode' => $qrcode,
+                    'scan_method' => $scanMethod,
+                    'reason' => 'CAMERA_DISABLED',
+                ],
+            );
+
             return response()->json([
                 'message' => 'Camera scanner tidak diaktifkan pada outlet ini.',
             ], 403);
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | CARI TIKET
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | CARI TIKET
+        |--------------------------------------------------------------------------
+        */
         $ticket = TicketQrcode::query()
-            ->where('qrcode', trim($request->qrcode))
+            ->where('qrcode', $qrcode)
             ->first();
 
-
         if (!$ticket) {
+            $this->auditLog->log(
+                action: 'SCAN_FAILED',
+                module: 'SCAN_RECORD',
+                description: "Scan gagal: QRCode tidak ditemukan di outlet {$outlet->outlet_name}",
+                model: $outlet,
+                newValues: [
+                    'outlet_id' => $outlet->id,
+                    'qrcode' => $qrcode,
+                    'scan_method' => $scanMethod,
+                    'reason' => 'TICKET_NOT_FOUND',
+                ],
+            );
+
             return response()->json([
                 'message' => 'Tiket tidak ditemukan.',
             ], 404);
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | CEK SUDAH PERNAH SCAN
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | CEK SUDAH PERNAH SCAN
+        |--------------------------------------------------------------------------
+        */
         $alreadyScanned = ScanRecord::query()
             ->where('ticket_qrcode_id', $ticket->id)
             ->where('outlet_id', $outlet->id)
             ->exists();
 
         if ($alreadyScanned) {
+            $this->auditLog->log(
+                action: 'SCAN_FAILED',
+                module: 'SCAN_RECORD',
+                description: "Scan gagal: tiket {$ticket->no_tiket} sudah pernah digunakan di outlet {$outlet->outlet_name}",
+                model: $ticket,
+                newValues: [
+                    'outlet_id' => $outlet->id,
+                    'qrcode' => $ticket->qrcode,
+                    'no_tiket' => $ticket->no_tiket,
+                    'ticket_qrcode_id' => $ticket->id,
+                    'scan_method' => $scanMethod,
+                    'reason' => 'ALREADY_SCANNED',
+                ],
+            );
+
             return response()->json([
                 'message' => 'Tiket sudah pernah digunakan di wahana ini.',
             ], 422);
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | SIMPAN
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | SIMPAN SCAN + AUDIT
+        |--------------------------------------------------------------------------
+        */
         $scanRecord = DB::transaction(function () use (
             $user,
             $outlet,
             $ticket,
             $scanMethod
         ) {
-
-            return ScanRecord::create([
-
+            $scanRecord = ScanRecord::create([
                 'user_id' => $user->id,
-
                 'outlet_id' => $outlet->id,
-
                 'ticket_qrcode_id' => $ticket->id,
-
                 'qrcode' => $ticket->qrcode,
-
                 'no_tiket' => $ticket->no_tiket,
                 'ticket_type' => $ticket->ticket_type,
-
                 'scan_method' => $scanMethod,
-
                 'scanned_at' => now(),
-
             ]);
+
+            $this->auditLog->log(
+                action: 'SCAN',
+                module: 'SCAN_RECORD',
+                description: "Scan tiket {$ticket->no_tiket} berhasil di outlet {$outlet->outlet_name}",
+                model: $scanRecord,
+                newValues: [
+                    'scan_record_id' => $scanRecord->id,
+                    'ticket_qrcode_id' => $ticket->id,
+                    'qrcode' => $ticket->qrcode,
+                    'no_tiket' => $ticket->no_tiket,
+                    'ticket_type' => $ticket->ticket_type,
+                    'outlet_id' => $outlet->id,
+                    'outlet_name' => $outlet->outlet_name,
+                    'scan_method' => $scanMethod,
+                    'scanned_at' => $scanRecord->scanned_at?->format('Y-m-d H:i:s'),
+                ],
+            );
+
+            return $scanRecord;
         });
 
         /*
-    |--------------------------------------------------------------------------
-    | RESPONSE
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | RESPONSE
+        |--------------------------------------------------------------------------
+        */
         return response()->json([
-
             'success' => true,
-
             'message' => 'Tiket berhasil diterima.',
-
             'data' => [
-
                 'qrcode' => $ticket->qrcode,
-
                 'no_tiket' => $ticket->no_tiket,
-
                 'ticket_type' => $ticket->ticket_type,
-
                 'outlet_code' => $outlet->outlet_code,
-
                 'outlet_name' => $outlet->outlet_name,
-
                 'scan_method' => $scanMethod,
-
                 'scanned_at' => $scanRecord->scanned_at
                     ->format('d-m-Y H:i:s'),
-
             ],
-
         ]);
     }
-
-
-
-
-
-
 
     /**
      * Scan Records
@@ -613,7 +668,29 @@ class ScanController extends Controller
 
     public function destroy(ScanRecord $scanRecord)
     {
-        $scanRecord->delete();
+        $oldValues = $scanRecord->toArray();
+
+        $scanRecordId = $scanRecord->id;
+        $ticketNumber = $scanRecord->no_tiket;
+        $outletName = $scanRecord->outlet?->outlet_name ?? '-';
+
+        DB::transaction(function () use (
+            $scanRecord,
+            $oldValues,
+            $scanRecordId,
+            $ticketNumber,
+            $outletName
+        ) {
+            $scanRecord->delete();
+
+            $this->auditLog->log(
+                action: 'DELETE',
+                module: 'SCAN_RECORD',
+                description: "Menghapus Scan Record #{$scanRecordId} tiket {$ticketNumber} dari outlet {$outletName}",
+                model: $scanRecord,
+                oldValues: $oldValues,
+            );
+        });
 
         return response()->json([
             'message' => 'Data scan berhasil dihapus.',
@@ -719,6 +796,19 @@ class ScanController extends Controller
         | EXPORT
         |--------------------------------------------------------------------------
         */
+
+        $this->auditLog->log(
+            action: 'EXPORT',
+            module: 'SCAN_RECORD',
+            description: "Export Scan Record periode {$dateFrom} s/d {$dateTo}",
+            newValues: [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'user_id' => $userId,
+                'outlet_id' => $outletId,
+                'outlet_type' => $outletType,
+            ],
+        );
 
         return Excel::download(
             new ScanRecordsExport(
