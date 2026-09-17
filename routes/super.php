@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\{
     TicketQrcodeController,
     UserOutletController,
     ScanController,
+    AuditLogController,
 };
 
 Route::middleware(['auth'])
@@ -270,5 +271,46 @@ Route::middleware(['auth'])
                 )
                     ->middleware('permission:scan-records.view')
                     ->name('export');
+            });
+
+
+
+
+        Route::prefix('audit-logs')
+            ->name('audit-logs.')
+            ->group(function () {
+
+                Route::get('/', [
+                    AuditLogController::class,
+                    'index'
+                ])
+                    ->middleware('permission:audit-logs.view')
+                    ->name('index');
+
+                Route::get('/dt', [
+                    AuditLogController::class,
+                    'dt'
+                ])
+                    ->middleware('permission:audit-logs.view')
+                    ->name('dt');
+
+
+
+                Route::get('/export', [
+                    AuditLogController::class,
+                    'export'
+                ])
+                    ->middleware('permission:audit-logs.view')
+                    ->name('export');
+
+
+
+
+                Route::get('/{auditLog}', [
+                    AuditLogController::class,
+                    'show'
+                ])
+                    ->middleware('permission:audit-logs.view')
+                    ->name('show');
             });
     });
