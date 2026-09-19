@@ -49,7 +49,7 @@ class DashboardController extends Controller
         $scanByOutlet = ScanRecord::query()
             ->select(
                 'outlet_id',
-                DB::raw('COUNT(*) as total')
+                DB::raw('COUNT(DISTINCT ticket_qrcode_id) as total')
             )
             ->whereDate('scanned_at', $scanDate)
             ->with('outlet')

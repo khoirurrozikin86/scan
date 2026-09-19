@@ -11,35 +11,42 @@ class OutletData
         public bool $is_active = true,
         public bool $is_camera_enabled = true,
         public bool $is_scanner_enabled = true,
+        public ?int $scan_limit = 1,
         public ?string $remark = null,
     ) {}
 
     public static function fromArray(array $a): self
     {
+        $scanLimit = $a['scan_limit'] ?? null;
+
         return new self(
             outlet_code: trim((string) ($a['outlet_code'] ?? '')),
-
-            outlet_name: trim(
-                (string) ($a['outlet_name'] ?? '')
-            ),
-
-            outlet_type: trim(
-                (string) ($a['outlet_type'] ?? '')
-            ),
+            outlet_name: trim((string) ($a['outlet_name'] ?? '')),
+            outlet_type: trim((string) ($a['outlet_type'] ?? '')),
 
             is_active: filter_var(
                 $a['is_active'] ?? true,
                 FILTER_VALIDATE_BOOLEAN
             ),
+
             is_camera_enabled: filter_var(
                 $a['is_camera_enabled'] ?? true,
                 FILTER_VALIDATE_BOOLEAN
             ),
+
             is_scanner_enabled: filter_var(
                 $a['is_scanner_enabled'] ?? true,
                 FILTER_VALIDATE_BOOLEAN
             ),
-            remark: trim((string) ($a['remark'] ?? null)),
+
+            scan_limit: (
+                $scanLimit === null ||
+                $scanLimit === ''
+            )
+                ? null
+                : max(1, (int) $scanLimit),
+
+            remark: trim((string) ($a['remark'] ?? '')),
         );
     }
 
@@ -49,11 +56,10 @@ class OutletData
             'outlet_code' => $this->outlet_code,
             'outlet_name' => $this->outlet_name,
             'outlet_type' => $this->outlet_type,
-            'is_active'   => $this->is_active,
-
+            'is_active' => $this->is_active,
             'is_camera_enabled' => $this->is_camera_enabled,
             'is_scanner_enabled' => $this->is_scanner_enabled,
-
+            'scan_limit' => $this->scan_limit,
             'remark' => $this->remark,
         ];
     }

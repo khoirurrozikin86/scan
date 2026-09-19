@@ -20,6 +20,7 @@ class Outlet extends Model
         'is_active',
         'is_camera_enabled',
         'is_scanner_enabled',
+        'scan_limit',
         'remark',
     ];
 
@@ -28,6 +29,7 @@ class Outlet extends Model
         'is_active' => 'boolean',
         'is_camera_enabled' => 'boolean',
         'is_scanner_enabled' => 'boolean',
+        'scan_limit' => 'integer',
     ];
 
     public function users(): BelongsToMany

@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class OutletStoreRequest extends FormRequest
 {
@@ -49,19 +48,22 @@ class OutletStoreRequest extends FormRequest
                 'boolean',
             ],
 
+            'scan_limit' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
             'remark' => [
                 'nullable',
                 'string',
                 'max:5000',
             ],
-
         ];
     }
 
     public function sanitized(): array
     {
-
-
         return $this->validated();
     }
 }

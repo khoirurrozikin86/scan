@@ -31,6 +31,7 @@ class OutletsExport implements
             'Outlet Name',
             'Outlet Type',
             'Status',
+            'Scan Limit',
             'Created At',
             'Updated At',
         ];
@@ -48,6 +49,9 @@ class OutletsExport implements
             $outlet->is_active
                 ? 'Active'
                 : 'Non Active',
+            $outlet->scan_limit === null
+                ? 'Unlimited'
+                : $outlet->scan_limit . ' kali',
             optional($outlet->created_at)
                 ->format('Y-m-d H:i:s'),
             optional($outlet->updated_at)

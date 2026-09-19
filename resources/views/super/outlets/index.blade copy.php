@@ -52,7 +52,6 @@
                                     <th>status</th>
                                     <th>Camera</th>
                                     <th>Scanner</th>
-                                    <th>Scan Limit</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -182,27 +181,6 @@
                         </div>
 
 
-                        <div class="col-md-12">
-                            <label class="form-label" for="scan_limit">
-                                Scan Limit
-                            </label>
-
-                            <select class="form-select" id="scan_limit" name="scan_limit">
-                                <option value="1">1 kali</option>
-                                <option value="2">2 kali</option>
-                                <option value="3">3 kali</option>
-                                <option value="">Unlimited</option>
-                            </select>
-
-                            <div class="form-text">
-                                Jumlah maksimal scan QR yang sama pada outlet ini.
-                                Pilih Unlimited jika tidak dibatasi.
-                            </div>
-
-                            <div class="invalid-feedback" id="scan_limitErr"></div>
-                        </div>
-
-
                         <div class="mb-3">
 
                             <label for="remark" class="form-label">
@@ -308,13 +286,11 @@
             const $outletName = $('#outlet_name');
             const $outletType = $('#outlet_type');
             const $isActive = $('#is_active');
-            const $scanLimit = $('#scan_limit');
 
             const $outletCodeErr = $('#outlet_codeErr');
             const $outletNameErr = $('#outlet_nameErr');
             const $outletTypeErr = $('#outlet_typeErr');
             const $isActiveErr = $('#is_activeErr');
-            const $scanLimitErr = $('#scan_limitErr');
 
             $.ajaxSetup({
                 headers: {
@@ -341,8 +317,7 @@
                     $outletCode,
                     $outletName,
                     $outletType,
-                    $isActive,
-                    $scanLimit
+                    $isActive
                 ].forEach($el => {
                     $el.removeClass('is-invalid');
                 });
@@ -351,7 +326,6 @@
                 $outletNameErr.text('');
                 $outletTypeErr.text('');
                 $isActiveErr.text('');
-                $scanLimitErr.text('');
             }
 
             function toastOk(msg) {
@@ -417,10 +391,6 @@
                     {
                         data: 'is_scanner_enabled',
                         name: 'is_scanner_enabled'
-                    },
-                    {
-                        data: 'scan_limit',
-                        name: 'scan_limit'
                     },
 
                     {
@@ -495,8 +465,6 @@
                 $outletName.val(payload.outlet_name || '');
                 $outletType.val(payload.outlet_type || '');
                 $isActive.val(payload.is_active ? '1' : '0');
-                $scanLimit.val(payload.scan_limit === null || payload.scan_limit === undefined ? '' : String(
-                    payload.scan_limit));
 
                 // Camera
                 $('#is_camera_enabled').prop(

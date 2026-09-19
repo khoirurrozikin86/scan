@@ -16,12 +16,10 @@ class OutletTableQuery
                 'outlet_name',
                 'outlet_type',
                 'is_active',
-
                 'is_camera_enabled',
                 'is_scanner_enabled',
+                'scan_limit',
                 'remark',
-
-
                 'created_at',
                 'updated_at',
             ])->orderByDesc('created_at');
