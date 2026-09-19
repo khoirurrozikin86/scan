@@ -54,6 +54,13 @@ class OutletController extends Controller
                     : 'Disabled'
             )
 
+            ->editColumn(
+                'scan_limit',
+                fn(Outlet $outlet) => $outlet->scan_limit === null
+                    ? 'Unlimited'
+                    : $outlet->scan_limit . 'x'
+            )
+
             ->addColumn('actions', function (Outlet $outlet) {
 
                 $actions = [
@@ -79,6 +86,7 @@ class OutletController extends Controller
                             'is_active'   => $outlet->is_active,
                             'is_camera_enabled' => $outlet->is_camera_enabled,
                             'is_scanner_enabled' => $outlet->is_scanner_enabled,
+                            'scan_limit' => $outlet->scan_limit,
                             'remark' => $outlet->remark,
                         ],
                     ],

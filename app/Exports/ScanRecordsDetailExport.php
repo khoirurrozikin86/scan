@@ -7,15 +7,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithTitle;
 
-class ScanRecordsExport implements
-    FromQuery,
-    WithHeadings,
-    WithMapping,
-    WithMultipleSheets,
-    WithTitle
+class ScanRecordsDetailExport implements FromQuery, WithHeadings, WithMapping, WithTitle
 {
     public function __construct(
         protected string $dateFrom,
@@ -26,49 +20,10 @@ class ScanRecordsExport implements
         protected array $allowedOutletIds = [],
     ) {}
 
-
     public function title(): string
     {
-        return 'Detail Scan';
+        return 'Rekap detail Outlet';
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SHEETS
-    |--------------------------------------------------------------------------
-    */
-
-    public function sheets(): array
-    {
-        return [
-            new ScanRecordsDetailExport(
-                $this->dateFrom,
-                $this->dateTo,
-                $this->userId,
-                $this->outletId,
-                $this->outletType,
-                $this->allowedOutletIds,
-            ),
-
-            new ScanOutletSummaryExport(
-                $this->dateFrom,
-                $this->dateTo,
-                $this->userId,
-                $this->outletId,
-                $this->outletType,
-                $this->allowedOutletIds,
-            ),
-        ];
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | QUERY
-    |--------------------------------------------------------------------------
-    |
-    | Tetap dipertahankan supaya struktur export lama tidak hilang.
-    |
-    */
 
     public function query(): Builder
     {
@@ -77,16 +32,14 @@ class ScanRecordsExport implements
                 'user',
                 'outlet',
             ])
-            ->whereDate(
-                'scanned_at',
-                '>=',
-                $this->dateFrom
-            )
-            ->whereDate(
-                'scanned_at',
-                '<=',
-                $this->dateTo
-            );
+            ->whereDate('scanned_at', '>=', $this->dateFrom)
+            ->whereDate('scanned_at', '<=', $this->dateTo);
+
+        /*
+        |--------------------------------------------------------------------------
+        | BATASI OUTLET SESUAI AKSES USER
+        |--------------------------------------------------------------------------
+        */
 
         if (!empty($this->allowedOutletIds)) {
             $query->whereIn(
@@ -95,6 +48,12 @@ class ScanRecordsExport implements
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER USERNAME
+        |--------------------------------------------------------------------------
+        */
+
         if ($this->userId !== null) {
             $query->where(
                 'user_id',
@@ -102,12 +61,24 @@ class ScanRecordsExport implements
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER OUTLET
+        |--------------------------------------------------------------------------
+        */
+
         if ($this->outletId !== null) {
             $query->where(
                 'outlet_id',
                 $this->outletId
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER OUTLET TYPE
+        |--------------------------------------------------------------------------
+        */
 
         if (
             $this->outletType !== null &&

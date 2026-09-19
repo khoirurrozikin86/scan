@@ -132,6 +132,46 @@
 
 
         {{-- =====================================================
+             REKAP TIKET UNIK PER OUTLET
+             ====================================================== --}}
+        <div class="scan-table-card mb-4">
+
+            <div class="scan-table-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h6 class="mb-1 fw-bold">Rekap Tiket per Outlet</h6>
+                        <small class="text-muted">
+                            QR Code yang discan berulang di outlet yang sama dihitung 1 tiket.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="outletSummaryTable" class="table table-bordered align-middle w-100 mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:70px;">No</th>
+                                <th>Kode Outlet</th>
+                                <th>Nama Outlet</th>
+                                <th style="width:180px;" class="text-end">Tiket Unik</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    Belum ada data.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+
+        {{-- =====================================================
              TABLE
              ====================================================== --}}
         <div class="scan-table-card">
@@ -199,8 +239,8 @@
 
 
         /* =========================================================
-           PAGE
-           ========================================================== */
+                   PAGE
+                   ========================================================== */
 
         .scan-records-page {
             padding-bottom: 32px;
@@ -208,8 +248,8 @@
 
 
         /* =========================================================
-           HEADER
-           ========================================================== */
+                   HEADER
+                   ========================================================== */
 
         .scan-records-header {
             margin-bottom: 22px;
@@ -236,8 +276,8 @@
 
 
         /* =========================================================
-           FILTER
-           ========================================================== */
+                   FILTER
+                   ========================================================== */
 
         .scan-filter-card {
             width: 100%;
@@ -285,8 +325,8 @@
 
 
         /* =========================================================
-           SELECT
-           ========================================================== */
+                   SELECT
+                   ========================================================== */
 
         .scan-filter-select {
             width: 100%;
@@ -324,8 +364,8 @@
 
 
         /* =========================================================
-           PERIOD
-           ========================================================== */
+                   PERIOD
+                   ========================================================== */
 
         .scan-period {
             width: 100%;
@@ -407,8 +447,8 @@
 
 
         /* =========================================================
-           BUTTONS
-           ========================================================== */
+                   BUTTONS
+                   ========================================================== */
 
         .scan-filter-actions {
             display: flex;
@@ -482,8 +522,8 @@
 
 
         /* =========================================================
-           TABLE CARD
-           ========================================================== */
+                   TABLE CARD
+                   ========================================================== */
 
         .scan-table-card {
             width: 100%;
@@ -504,8 +544,8 @@
 
 
         /* =========================================================
-           TABLE
-           ========================================================== */
+                   TABLE
+                   ========================================================== */
 
         #scanRecordsTable {
             width: 100% !important;
@@ -558,8 +598,8 @@
 
 
         /* =========================================================
-           DATATABLE
-           ========================================================== */
+                   DATATABLE
+                   ========================================================== */
 
         #scanRecordsTable_wrapper {
             width: 100%;
@@ -676,8 +716,8 @@
 
 
         /* =========================================================
-           ACTION DELETE
-           ========================================================== */
+                   ACTION DELETE
+                   ========================================================== */
 
         .btn-delete-scan {
             width: 30px;
@@ -718,8 +758,8 @@
 
 
         /* =========================================================
-           RESPONSIVE
-           ========================================================== */
+                   RESPONSIVE
+                   ========================================================== */
 
         @media (max-width: 1200px) {
 
@@ -820,6 +860,50 @@
             if (window.feather) {
                 feather.replace();
             }
+
+
+            /* =====================================================
+               REKAP OUTLET
+               ====================================================== */
+
+            function renderOutletSummary(rows) {
+
+                const $tbody = $('#outletSummaryTable tbody');
+
+                $tbody.empty();
+
+                if (!rows || rows.length === 0) {
+                    $tbody.html(`
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                Tidak ada data sesuai filter.
+                            </td>
+                        </tr>
+                    `);
+                    return;
+                }
+
+                rows.forEach(function(row, index) {
+                    $tbody.append(`
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${escapeHtml(row.outlet_code ?? '-')}</td>
+                            <td>${escapeHtml(row.outlet_name ?? '-')}</td>
+                            <td class="text-end fw-bold">
+                                ${Number(row.total_tiket ?? 0).toLocaleString('id-ID')}
+                            </td>
+                        </tr>
+                    `);
+                });
+            }
+
+            function escapeHtml(value) {
+                return $('<div>').text(value ?? '').html();
+            }
+
+            $('#scanRecordsTable').on('xhr.dt', function(e, settings, json) {
+                renderOutletSummary(json?.outlet_summary ?? []);
+            });
 
 
             /* =====================================================

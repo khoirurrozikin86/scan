@@ -52,6 +52,12 @@ class OutletUpdateRequest extends FormRequest
                 'boolean',
             ],
 
+            'scan_limit' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
             'remark' => [
                 'nullable',
                 'string',

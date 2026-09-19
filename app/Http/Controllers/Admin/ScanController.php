@@ -4,25 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Audit\Services\AuditLogService;
-use App\Domain\ScanRecords\Queries\ScanRecordTableQuery;
 use App\Models\Outlet;
 use App\Models\User;
 use App\Models\TicketQrcode;
 use App\Models\ScanRecord;
 use Illuminate\Http\Request;
-use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
-
-
-use App\Exports\ScanRecordsExport;
 use Maatwebsite\Excel\Facades\Excel;
-
-
+use Yajra\DataTables\Facades\DataTables;
+use App\Exports\ScanRecordsExport;
 
 class ScanController extends Controller
 {
     public function __construct(
-        protected AuditLogService $auditLog,
+        protected AuditLogService $auditLog
     ) {}
 
     /**
@@ -40,6 +35,8 @@ class ScanController extends Controller
                 'outlets.id',
                 'outlets.outlet_code',
                 'outlets.outlet_name',
+                'outlets.outlet_type',
+                'outlets.scan_limit',
             ]);
 
         return view(
@@ -47,7 +44,6 @@ class ScanController extends Controller
             compact('outlets')
         );
     }
-
 
     /**
      * Barcode Scanner
@@ -64,6 +60,8 @@ class ScanController extends Controller
                 'outlets.id',
                 'outlets.outlet_code',
                 'outlets.outlet_name',
+                'outlets.outlet_type',
+                'outlets.scan_limit',
             ]);
 
         return view(
@@ -72,26 +70,28 @@ class ScanController extends Controller
         );
     }
 
-
-
-
-
-
     /**
      * Scan Ticket
      */
     public function scan(Request $request)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDASI REQUEST
+        |--------------------------------------------------------------------------
+        */
         $request->validate([
             'outlet_id' => [
                 'required',
                 'integer',
             ],
+
             'qrcode' => [
                 'required',
                 'string',
                 'max:255',
             ],
+
             'scan_method' => [
                 'required',
                 'in:camera,scanner',
@@ -99,26 +99,33 @@ class ScanController extends Controller
         ]);
 
         $user = $request->user();
+
+        $outletId = (int) $request->input('outlet_id');
         $scanMethod = $request->input('scan_method');
-        $qrcode = trim($request->input('qrcode'));
+        $qrcode = trim((string) $request->input('qrcode'));
 
         /*
         |--------------------------------------------------------------------------
-        | CEK OUTLET
+        | CEK OUTLET + AKSES USER
         |--------------------------------------------------------------------------
+        |
+        | User hanya boleh scan pada outlet yang memang diberikan kepadanya.
+        | Outlet juga harus aktif.
+        |
         */
         $outlet = $user->outlets()
-            ->where('outlets.id', $request->outlet_id)
+            ->where('outlets.id', $outletId)
             ->where('outlets.is_active', true)
             ->first();
 
         if (!$outlet) {
+
             $this->auditLog->log(
                 action: 'SCAN_FAILED',
                 module: 'SCAN_RECORD',
-                description: "Scan gagal: user #{$user->id} tidak memiliki akses ke outlet #{$request->outlet_id}",
+                description: "Scan gagal: user #{$user->id} tidak memiliki akses ke outlet #{$outletId}",
                 newValues: [
-                    'outlet_id' => (int) $request->outlet_id,
+                    'outlet_id' => $outletId,
                     'qrcode' => $qrcode,
                     'scan_method' => $scanMethod,
                     'reason' => 'OUTLET_ACCESS_DENIED',
@@ -126,6 +133,7 @@ class ScanController extends Controller
             );
 
             return response()->json([
+                'success' => false,
                 'message' => 'Anda tidak memiliki akses ke outlet ini.',
             ], 403);
         }
@@ -139,6 +147,7 @@ class ScanController extends Controller
             $scanMethod === 'scanner'
             && !$outlet->is_scanner_enabled
         ) {
+
             $this->auditLog->log(
                 action: 'SCAN_FAILED',
                 module: 'SCAN_RECORD',
@@ -153,14 +162,21 @@ class ScanController extends Controller
             );
 
             return response()->json([
+                'success' => false,
                 'message' => 'Barcode scanner tidak diaktifkan pada outlet ini.',
             ], 403);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | CEK CAMERA
+        |--------------------------------------------------------------------------
+        */
         if (
             $scanMethod === 'camera'
             && !$outlet->is_camera_enabled
         ) {
+
             $this->auditLog->log(
                 action: 'SCAN_FAILED',
                 module: 'SCAN_RECORD',
@@ -175,91 +191,133 @@ class ScanController extends Controller
             );
 
             return response()->json([
+                'success' => false,
                 'message' => 'Camera scanner tidak diaktifkan pada outlet ini.',
             ], 403);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | CARI TIKET
+        | CARI TICKET QR CODE
         |--------------------------------------------------------------------------
+        |
+        | QR harus benar-benar terdaftar di tabel ticket_qrcodes.
+        |
         */
         $ticket = TicketQrcode::query()
             ->where('qrcode', $qrcode)
             ->first();
 
         if (!$ticket) {
+
             $this->auditLog->log(
                 action: 'SCAN_FAILED',
                 module: 'SCAN_RECORD',
-                description: "Scan gagal: QRCode tidak ditemukan di outlet {$outlet->outlet_name}",
+                description: "Scan gagal: QR Code {$qrcode} tidak ditemukan",
                 model: $outlet,
                 newValues: [
                     'outlet_id' => $outlet->id,
+                    'outlet_name' => $outlet->outlet_name,
                     'qrcode' => $qrcode,
                     'scan_method' => $scanMethod,
-                    'reason' => 'TICKET_NOT_FOUND',
+                    'reason' => 'TICKET_QRCODE_NOT_FOUND',
                 ],
             );
 
             return response()->json([
-                'message' => 'Tiket tidak ditemukan.',
+                'success' => false,
+                'message' => 'QR Code tiket tidak terdaftar.',
             ], 404);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | CEK SUDAH PERNAH SCAN
+        | CEK SCAN LIMIT
         |--------------------------------------------------------------------------
+        |
+        | scan_limit:
+        |
+        | 1    = maksimal 1 scan
+        | 2    = maksimal 2 scan
+        | 3    = maksimal 3 scan
+        | NULL = unlimited
+        |
         */
-        $alreadyScanned = ScanRecord::query()
+        $scanCount = ScanRecord::query()
             ->where('ticket_qrcode_id', $ticket->id)
             ->where('outlet_id', $outlet->id)
-            ->exists();
+            ->count();
 
-        if ($alreadyScanned) {
+        /*
+        |--------------------------------------------------------------------------
+        | BATAS SCAN TERCAPAI
+        |--------------------------------------------------------------------------
+        */
+        if (
+            $outlet->scan_limit !== null
+            && $scanCount >= $outlet->scan_limit
+        ) {
+
             $this->auditLog->log(
                 action: 'SCAN_FAILED',
                 module: 'SCAN_RECORD',
-                description: "Scan gagal: tiket {$ticket->no_tiket} sudah pernah digunakan di outlet {$outlet->outlet_name}",
+                description: "Scan gagal: tiket {$ticket->no_tiket} telah mencapai batas {$outlet->scan_limit}x di outlet {$outlet->outlet_name}",
                 model: $ticket,
                 newValues: [
                     'outlet_id' => $outlet->id,
+                    'outlet_name' => $outlet->outlet_name,
+                    'outlet_type' => $outlet->outlet_type,
+
+                    'ticket_qrcode_id' => $ticket->id,
                     'qrcode' => $ticket->qrcode,
                     'no_tiket' => $ticket->no_tiket,
-                    'ticket_qrcode_id' => $ticket->id,
+
                     'scan_method' => $scanMethod,
-                    'reason' => 'ALREADY_SCANNED',
+
+                    'scan_count' => $scanCount,
+                    'scan_limit' => $outlet->scan_limit,
+
+                    'reason' => 'SCAN_LIMIT_REACHED',
                 ],
             );
 
             return response()->json([
-                'message' => 'Tiket sudah pernah digunakan di wahana ini.',
+                'success' => false,
+                'message' => "Tiket sudah mencapai batas scan {$outlet->scan_limit}x di wahana ini.",
             ], 422);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | SIMPAN SCAN + AUDIT
+        | SIMPAN SCAN
         |--------------------------------------------------------------------------
         */
         $scanRecord = DB::transaction(function () use (
             $user,
             $outlet,
             $ticket,
-            $scanMethod
+            $scanMethod,
+            $scanCount
         ) {
+
             $scanRecord = ScanRecord::create([
                 'user_id' => $user->id,
                 'outlet_id' => $outlet->id,
                 'ticket_qrcode_id' => $ticket->id,
+
                 'qrcode' => $ticket->qrcode,
                 'no_tiket' => $ticket->no_tiket,
                 'ticket_type' => $ticket->ticket_type,
+
                 'scan_method' => $scanMethod,
                 'scanned_at' => now(),
             ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | AUDIT SUCCESS
+            |--------------------------------------------------------------------------
+            */
             $this->auditLog->log(
                 action: 'SCAN',
                 module: 'SCAN_RECORD',
@@ -267,14 +325,29 @@ class ScanController extends Controller
                 model: $scanRecord,
                 newValues: [
                     'scan_record_id' => $scanRecord->id,
+
                     'ticket_qrcode_id' => $ticket->id,
                     'qrcode' => $ticket->qrcode,
                     'no_tiket' => $ticket->no_tiket,
                     'ticket_type' => $ticket->ticket_type,
+
                     'outlet_id' => $outlet->id,
                     'outlet_name' => $outlet->outlet_name,
+                    'outlet_type' => $outlet->outlet_type,
+
+                    'scan_count_before' => $scanCount,
+                    'scan_count_after' => $scanCount + 1,
+
+                    'scan_limit' => $outlet->scan_limit,
+
+                    'scan_policy' => $outlet->scan_limit === null
+                        ? 'UNLIMITED'
+                        : 'LIMITED',
+
                     'scan_method' => $scanMethod,
-                    'scanned_at' => $scanRecord->scanned_at?->format('Y-m-d H:i:s'),
+
+                    'scanned_at' => $scanRecord->scanned_at
+                        ?->format('Y-m-d H:i:s'),
                 ],
             );
 
@@ -286,16 +359,35 @@ class ScanController extends Controller
         | RESPONSE
         |--------------------------------------------------------------------------
         */
+        $currentScanCount = $scanCount + 1;
+
+        $remainingScan = $outlet->scan_limit === null
+            ? null
+            : max(
+                0,
+                $outlet->scan_limit - $currentScanCount
+            );
+
         return response()->json([
             'success' => true,
+
             'message' => 'Tiket berhasil diterima.',
+
             'data' => [
                 'qrcode' => $ticket->qrcode,
                 'no_tiket' => $ticket->no_tiket,
                 'ticket_type' => $ticket->ticket_type,
+
                 'outlet_code' => $outlet->outlet_code,
                 'outlet_name' => $outlet->outlet_name,
+                'outlet_type' => $outlet->outlet_type,
+
                 'scan_method' => $scanMethod,
+
+                'scan_count' => $currentScanCount,
+                'scan_limit' => $outlet->scan_limit,
+                'remaining_scan' => $remainingScan,
+
                 'scanned_at' => $scanRecord->scanned_at
                     ->format('d-m-Y H:i:s'),
             ],
@@ -312,11 +404,10 @@ class ScanController extends Controller
         $isSuperAdmin = $user->hasRole('super-admin');
 
         /*
-    |--------------------------------------------------------------------------
-    | OUTLET YANG BOLEH DIAKSES USER
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | OUTLET YANG BOLEH DIAKSES USER
+        |--------------------------------------------------------------------------
+        */
         if ($isSuperAdmin) {
 
             $outlets = Outlet::query()
@@ -327,6 +418,7 @@ class ScanController extends Controller
                     'outlet_code',
                     'outlet_name',
                     'outlet_type',
+                    'scan_limit',
                 ]);
         } else {
 
@@ -338,17 +430,20 @@ class ScanController extends Controller
                     'outlets.outlet_code',
                     'outlets.outlet_name',
                     'outlets.outlet_type',
+                    'outlets.scan_limit',
                 ]);
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | USERNAME / OPERATOR
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | USERNAME / OPERATOR
+        |--------------------------------------------------------------------------
+        */
         $users = User::query()
-            ->whereHas('scanRecords', function ($query) use ($isSuperAdmin, $user) {
+            ->whereHas('scanRecords', function ($query) use (
+                $isSuperAdmin,
+                $user
+            ) {
 
                 if (!$isSuperAdmin) {
 
@@ -365,11 +460,10 @@ class ScanController extends Controller
             ]);
 
         /*
-    |--------------------------------------------------------------------------
-    | OUTLET TYPE
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | OUTLET TYPE
+        |--------------------------------------------------------------------------
+        */
         $outletTypes = $outlets
             ->pluck('outlet_type')
             ->filter()
@@ -390,7 +484,6 @@ class ScanController extends Controller
     /**
      * DataTable Scan Records
      */
-
     public function dt(Request $request)
     {
         $user = $request->user();
@@ -398,23 +491,22 @@ class ScanController extends Controller
         $isSuperAdmin = $user->hasRole('super-admin');
 
         /*
-    |--------------------------------------------------------------------------
-    | QUERY DASAR
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | QUERY DASAR
+        |--------------------------------------------------------------------------
+        */
         $query = ScanRecord::query()
             ->with([
                 'user',
                 'outlet',
+                'ticketQrcode',
             ]);
 
         /*
-    |--------------------------------------------------------------------------
-    | BATASI OUTLET USER
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | BATASI OUTLET USER
+        |--------------------------------------------------------------------------
+        */
         if (!$isSuperAdmin) {
 
             $allowedOutletIds = $user->outlets()
@@ -427,11 +519,10 @@ class ScanController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | FILTER PERIODE
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | FILTER PERIODE
+        |--------------------------------------------------------------------------
+        */
         if ($request->filled('date_from')) {
 
             $query->whereDate(
@@ -451,11 +542,10 @@ class ScanController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | FILTER USERNAME / OPERATOR
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | FILTER USERNAME / OPERATOR
+        |--------------------------------------------------------------------------
+        */
         if ($request->filled('user_id')) {
 
             $query->where(
@@ -465,11 +555,10 @@ class ScanController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | FILTER OUTLET
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | FILTER OUTLET
+        |--------------------------------------------------------------------------
+        */
         if ($request->filled('outlet_id')) {
 
             $query->where(
@@ -479,11 +568,10 @@ class ScanController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | FILTER OUTLET TYPE
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | FILTER OUTLET TYPE
+        |--------------------------------------------------------------------------
+        */
         if ($request->filled('outlet_type')) {
 
             $query->whereHas('outlet', function ($q) use ($request) {
@@ -496,11 +584,41 @@ class ScanController extends Controller
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | DATATABLE
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | REKAP TIKET UNIK PER OUTLET
+        |
+        | 1 QR + 1 OUTLET = 1 tiket.
+        | Duplicate scan tetap tampil di tabel detail,
+        | tetapi hanya dihitung 1 pada tabel rekap.
+        |--------------------------------------------------------------------------
+        */
+        $summaryQuery = clone $query;
 
+        $outletSummary = $summaryQuery
+            ->select(
+                'outlet_id',
+                DB::raw('COUNT(DISTINCT ticket_qrcode_id) as total_tiket')
+            )
+            ->with(['outlet:id,outlet_code,outlet_name'])
+            ->groupBy('outlet_id')
+            ->orderByDesc('total_tiket')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'outlet_id' => $row->outlet_id,
+                    'outlet_code' => $row->outlet?->outlet_code ?? '-',
+                    'outlet_name' => $row->outlet?->outlet_name ?? '-',
+                    'total_tiket' => (int) $row->total_tiket,
+                ];
+            })
+            ->values()
+            ->all();
+
+        /*
+        |--------------------------------------------------------------------------
+        | DATATABLE
+        |--------------------------------------------------------------------------
+        */
         return DataTables::of($query)
 
             ->addColumn(
@@ -521,6 +639,18 @@ class ScanController extends Controller
                 $scan->outlet?->outlet_type ?? '-'
             )
 
+            ->addColumn(
+                'scan_limit',
+                function ($scan) {
+
+                    $limit = $scan->outlet?->scan_limit;
+
+                    return $limit === null
+                        ? 'Unlimited'
+                        : $limit . ' kali';
+                }
+            )
+
             ->editColumn(
                 'scan_method',
                 fn($scan) =>
@@ -536,108 +666,116 @@ class ScanController extends Controller
             )
 
             ->addColumn('action', function ($scan) {
-                $url = route('super.scan-records.destroy', [
-                    'scanRecord' => $scan->id
-                ]);
+
+                $url = route(
+                    'super.scan-records.destroy',
+                    [
+                        'scanRecord' => $scan->id,
+                    ]
+                );
 
                 return '
-        <span
-            class="badge bg-danger btn-delete-scan"
-            data-url="' . e($url) . '"
-            title="Hapus"
-            style="cursor:pointer; display:inline-flex; align-items:center; justify-content:center;"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-                <path d="M10 11v6"></path>
-                <path d="M14 11v6"></path>
-                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
-            </svg>
-        </span>
-    ';
+                    <span
+                        class="badge bg-danger btn-delete-scan"
+                        data-url="' . e($url) . '"
+                        title="Hapus"
+                        style="
+                            cursor:pointer;
+                            display:inline-flex;
+                            align-items:center;
+                            justify-content:center;
+                        "
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                            <path d="M10 11v6"></path>
+                            <path d="M14 11v6"></path>
+                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </span>
+                ';
             })
 
             ->rawColumns([
-                'action'
+                'action',
             ])
+
+            ->with('outlet_summary', $outletSummary)
 
             ->make(true);
     }
 
-
-
-
-
-
-
-
+    /**
+     * Scan History
+     */
     public function history(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
 
         $outletId = $request->input('outlet_id');
 
         if (!$outletId) {
+
             return response()->json([
                 'data' => [],
             ]);
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | CEK AKSES OUTLET
-    |--------------------------------------------------------------------------
-    | Super Admin boleh semua outlet
-    */
-
+        |--------------------------------------------------------------------------
+        | CEK AKSES OUTLET
+        |--------------------------------------------------------------------------
+        */
         $isSuperAdmin = $user->hasRole('super-admin');
 
-        if (!$isSuperAdmin) {
+        if ($isSuperAdmin) {
+
+            $hasAccess = Outlet::query()
+                ->whereKey($outletId)
+                ->where('is_active', true)
+                ->exists();
+        } else {
 
             $hasAccess = $user->outlets()
                 ->where('outlets.id', $outletId)
                 ->where('outlets.is_active', true)
                 ->exists();
-
-            if (!$hasAccess) {
-
-                return response()->json([
-                    'message' => 'Anda tidak memiliki akses ke outlet ini.'
-                ], 403);
-            }
         }
 
+        if (!$hasAccess) {
+
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses ke outlet ini.',
+            ], 403);
+        }
 
         /*
-    |--------------------------------------------------------------------------
-    | AMBIL 10 HISTORY TERBARU
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | AMBIL 10 HISTORY TERBARU
+        |--------------------------------------------------------------------------
+        */
         $records = ScanRecord::query()
             ->where('outlet_id', $outletId)
             ->latest('scanned_at')
             ->limit(10)
             ->get();
 
-
         /*
-    |--------------------------------------------------------------------------
-    | RESPONSE
-    |--------------------------------------------------------------------------
-    */
-
+        |--------------------------------------------------------------------------
+        | RESPONSE
+        |--------------------------------------------------------------------------
+        */
         return response()->json([
 
             'data' => $records->map(function ($record) {
@@ -664,8 +802,9 @@ class ScanController extends Controller
         ]);
     }
 
-
-
+    /**
+     * Delete Scan Record
+     */
     public function destroy(ScanRecord $scanRecord)
     {
         $oldValues = $scanRecord->toArray();
@@ -681,8 +820,14 @@ class ScanController extends Controller
             $ticketNumber,
             $outletName
         ) {
+
             $scanRecord->delete();
 
+            /*
+            |--------------------------------------------------------------------------
+            | AUDIT DELETE
+            |--------------------------------------------------------------------------
+            */
             $this->auditLog->log(
                 action: 'DELETE',
                 module: 'SCAN_RECORD',
@@ -697,31 +842,53 @@ class ScanController extends Controller
         ]);
     }
 
-
-
-
-
-
+    /**
+     * Export Scan Records
+     */
     public function export(Request $request)
     {
         $request->validate([
-            'date_from'   => ['required', 'date'],
-            'date_to'     => ['required', 'date', 'after_or_equal:date_from'],
-            'user_id'     => ['nullable', 'integer'],
-            'outlet_id'   => ['nullable', 'integer'],
-            'outlet_type' => ['nullable', 'string', 'max:100'],
+            'date_from' => [
+                'required',
+                'date',
+            ],
+
+            'date_to' => [
+                'required',
+                'date',
+                'after_or_equal:date_from',
+            ],
+
+            'user_id' => [
+                'nullable',
+                'integer',
+            ],
+
+            'outlet_id' => [
+                'nullable',
+                'integer',
+            ],
+
+            'outlet_type' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
         ]);
 
         $user = $request->user();
 
-        $dateFrom   = $request->input('date_from');
-        $dateTo     = $request->input('date_to');
-        $userId     = $request->filled('user_id')
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        $userId = $request->filled('user_id')
             ? (int) $request->input('user_id')
             : null;
-        $outletId   = $request->filled('outlet_id')
+
+        $outletId = $request->filled('outlet_id')
             ? (int) $request->input('outlet_id')
             : null;
+
         $outletType = $request->filled('outlet_type')
             ? $request->input('outlet_type')
             : null;
@@ -733,10 +900,10 @@ class ScanController extends Controller
         | OUTLET ACCESS
         |--------------------------------------------------------------------------
         */
-
         $allowedOutletIds = [];
 
         if (!$isSuperAdmin) {
+
             $allowedOutletIds = $user->outlets()
                 ->where('outlets.is_active', true)
                 ->pluck('outlets.id')
@@ -744,11 +911,23 @@ class ScanController extends Controller
                 ->all();
 
             /*
-            | User memilih outlet di luar hak akses
+            |--------------------------------------------------------------------------
+            | USER MEMILIH OUTLET DI LUAR HAK AKSES
+            |--------------------------------------------------------------------------
             */
+            if (
+                $outletId !== null
+                && !in_array(
+                    $outletId,
+                    $allowedOutletIds,
+                    true
+                )
+            ) {
 
-            if ($outletId !== null && !in_array($outletId, $allowedOutletIds, true)) {
-                abort(403, 'Anda tidak memiliki akses ke outlet ini.');
+                abort(
+                    403,
+                    'Anda tidak memiliki akses ke outlet ini.'
+                );
             }
         }
 
@@ -757,19 +936,31 @@ class ScanController extends Controller
         | USER ACCESS
         |--------------------------------------------------------------------------
         */
-
         if ($userId !== null) {
+
             $userExists = User::query()
                 ->whereKey($userId)
-                ->whereHas('scanRecords', function ($query) use ($isSuperAdmin, $allowedOutletIds) {
+                ->whereHas('scanRecords', function ($query) use (
+                    $isSuperAdmin,
+                    $allowedOutletIds
+                ) {
+
                     if (!$isSuperAdmin) {
-                        $query->whereIn('outlet_id', $allowedOutletIds);
+
+                        $query->whereIn(
+                            'outlet_id',
+                            $allowedOutletIds
+                        );
                     }
                 })
                 ->exists();
 
             if (!$userExists) {
-                abort(403, 'User tidak memiliki data scan yang dapat diakses.');
+
+                abort(
+                    403,
+                    'User tidak memiliki data scan yang dapat diakses.'
+                );
             }
         }
 
@@ -778,14 +969,18 @@ class ScanController extends Controller
         | FILENAME
         |--------------------------------------------------------------------------
         */
-
-        $filename = 'scan-records_' . $dateFrom . '_sd_' . $dateTo;
+        $filename = 'scan-records_'
+            . $dateFrom
+            . '_sd_'
+            . $dateTo;
 
         if ($userId !== null) {
+
             $filename .= '_user-' . $userId;
         }
 
         if ($outletId !== null) {
+
             $filename .= '_outlet-' . $outletId;
         }
 
@@ -793,10 +988,9 @@ class ScanController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | EXPORT
+        | AUDIT EXPORT
         |--------------------------------------------------------------------------
         */
-
         $this->auditLog->log(
             action: 'EXPORT',
             module: 'SCAN_RECORD',
@@ -810,6 +1004,11 @@ class ScanController extends Controller
             ],
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | EXPORT
+        |--------------------------------------------------------------------------
+        */
         return Excel::download(
             new ScanRecordsExport(
                 $dateFrom,
