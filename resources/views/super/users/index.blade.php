@@ -17,7 +17,15 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <h6 class="card-title mb-0">Users</h6>
-                        <a href="javascript:void(0)" id="btnNewUser" class="btn btn-primary btn-sm">+ New</a>
+
+                        <div class="d-flex gap-2">
+                            <a href="{{ route('super.user.export') }}" class="btn btn-success btn-sm">
+                                <i data-feather="download"></i>
+                                Export Excel
+                            </a>
+
+                            <a href="javascript:void(0)" id="btnNewUser" class="btn btn-primary btn-sm">+ New</a>
+                        </div>
                     </div>
 
                     @if (session('success'))

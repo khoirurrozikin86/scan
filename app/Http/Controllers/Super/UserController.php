@@ -18,6 +18,9 @@ use App\Support\DataTables\Responder;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 
+use App\Exports\UsersExport;
+use Maatwebsite\Excel\Facades\Excel;
+
 class UserController extends Controller
 {
     public function index()
@@ -97,5 +100,15 @@ class UserController extends Controller
             return response()->json(['message' => 'User deleted']);
         }
         return redirect()->route('super.users.index')->with('success', 'User deleted');
+    }
+
+
+
+    public function export()
+    {
+        return Excel::download(
+            new UsersExport(),
+            'users-' . now()->format('Y-m-d_H-i-s') . '.xlsx'
+        );
     }
 }

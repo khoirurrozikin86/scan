@@ -54,6 +54,9 @@ Route::middleware(['auth'])
             Route::middleware('permission:user.update')->put('/{user}', [UserController::class, 'update'])->name('update');
             Route::middleware('permission:user.delete')->delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
 
+            Route::get('/users/export', [UserController::class, 'export'])
+                ->name('export');
+
             Route::middleware('permission:user.update')->put('/{user}/roles', [UserManageController::class, 'syncRoles'])->name('roles.sync');
             Route::middleware('permission:user.update')->put('/{user}/perms', [UserManageController::class, 'syncPermissions'])->name('perms.sync');
         });
