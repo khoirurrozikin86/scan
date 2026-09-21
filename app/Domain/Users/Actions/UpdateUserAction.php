@@ -19,7 +19,7 @@ class UpdateUserAction
 
         $user->save();
 
-        if (!empty($data->roles) && method_exists($user, 'syncRoles')) {
+        if (method_exists($user, 'syncRoles')) {
             $user->syncRoles($data->roles);
         }
 

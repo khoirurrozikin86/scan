@@ -25,7 +25,9 @@ class UserController extends Controller
 {
     public function index()
     {
-        return view('super.users.index');
+        $roles = Role::orderBy('name')->pluck('name', 'name');
+
+        return view('super.users.index', compact('roles'));
     }
 
     // DataTables server-side (pakai Responder seperti di RoleController)
@@ -41,6 +43,7 @@ class UserController extends Controller
                     'payload'    => [
                         'name'  => $u->name,
                         'email' => $u->email,
+                        'roles' => method_exists($u, 'getRoleNames') ? $u->getRoleNames()->values()->toArray() : [],
                     ],
                 ],
                 [
